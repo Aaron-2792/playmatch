@@ -1,0 +1,7 @@
+# .gitignore file
+
+# Ignore all node modules
+node_modules
+
+# Ignore the environment file with our secrets!
+.env
