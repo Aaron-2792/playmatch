@@ -1,38 +1,192 @@
+/* client/src/App.css */
+:root {
+  --bg-color: #121212;
+  --card-bg: #1e1e1e;
+  --accent: #00d4ff;
+  --text-main: #ffffff;
+  --text-secondary: #b3b3b3;
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+}
+
 .App {
+  width: 100%;
+  max-width: 1200px;
+  /* Increased max-width for the 3-column grid */
+  padding: 2rem;
   text-align: center;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+h1 {
+  font-size: 3rem;
+  margin-bottom: 0.5rem;
+  background: linear-gradient(90deg, #00d4ff, #00ff88);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
-}
-
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
+.search-box {
+  background: var(--card-bg);
+  padding: 2rem;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  margin-bottom: 3rem;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
+  gap: 1rem;
+  max-width: 800px;
+  /* Keep search box focused */
+  margin-left: auto;
+  margin-right: auto;
+}
+
+input {
+  background: #2a2a2a;
+  border: 1px solid #333;
+  padding: 1rem;
+  border-radius: 8px;
   color: white;
+  font-size: 1rem;
+  outline: none;
+  transition: 0.2s;
 }
 
-.App-link {
-  color: #61dafb;
+input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.2);
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
+button {
+  background: var(--accent);
+  color: #000;
+  font-weight: bold;
+  padding: 1rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: transform 0.1s;
+}
+
+button:active {
+  transform: scale(0.98);
+}
+
+button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* --- UPDATED GRID & CARDS --- */
+
+.results-grid {
+  display: grid;
+  /* FORCE 3 columns on desktop */
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2rem;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* Tablet: 2 Columns */
+@media (max-width: 1000px) {
+  .results-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
-  to {
-    transform: rotate(360deg);
+}
+
+/* Mobile: 1 Column */
+@media (max-width: 600px) {
+  .results-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.game-card {
+  background: var(--card-bg);
+  border-radius: 12px;
+  overflow: hidden;
+  text-align: left;
+  border: 1px solid #333;
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 380px;
+  /* <--- CRITICAL FIX: Forces all cards to be tall */
+}
+
+.game-card:hover {
+  transform: translateY(-5px);
+  border-color: var(--accent);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
+}
+
+.card-image {
+  width: 100%;
+  height: 160px;
+  /* Slightly taller image */
+  background-size: cover;
+  background-position: center;
+  border-bottom: 1px solid #333;
+  background-color: #000;
+}
+
+.card-content {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  justify-content: flex-start;
+  /* Aligns text to top */
+}
+
+.game-title {
+  font-size: 1.3rem;
+  margin: 0 0 0.8rem 0;
+  color: var(--accent);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.ai-reason {
+  color: var(--text-secondary);
+  line-height: 1.5;
+  font-size: 0.95rem;
+}
+
+.error-msg {
+  color: #ff4444;
+  margin-top: 1rem;
+  font-weight: bold;
+}
+
+.loading {
+  font-size: 1.2rem;
+  color: var(--accent);
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.5;
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0.5;
   }
 }
