@@ -7,14 +7,11 @@ const cors = require('cors');
 const app = express();
 
 // --- Core Middleware ---
-app.use(cors()); // Enable Cross-Origin Resource Sharing
-app.use(express.json()); // Parse incoming JSON request bodies
+app.use(cors()); 
+app.use(express.json()); 
 
 // --- Routes ---
-// Import our new API routes
 const apiRoutes = require('./routes/api');
-
-// Tell Express to use those routes for any path that starts with /api
 app.use('/api', apiRoutes);
 
 // Export the configured app

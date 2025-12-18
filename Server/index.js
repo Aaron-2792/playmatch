@@ -3,7 +3,11 @@
 // Load environment variables from .env file immediately
 require('dotenv').config();
 
-// Import the configured express app
+// Import and run our database connection
+const connectDB = require('./config/db');
+connectDB();
+
+// Import the configured express app from app.js
 const app = require('./app');
 
 // Define the port, falling back to 5000
