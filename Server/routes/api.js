@@ -1,9 +1,7 @@
 // server/routes/api.js
 const express = require('express');
 const axios = require('axios');
-const fs = require('fs');
-const path = require('path');
-const csv = require('csv-parser');
+const mongoose = require('mongoose');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const router = express.Router();
 
@@ -14,84 +12,38 @@ const STEAM_API_BASE = 'http://api.steampowered.com';
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-// --- 1. SMART SYNONYMS (The "Search Dictionary") ---
+// --- 1. MONGO SCHEMA ---
+const GameSchema = new mongoose.Schema({
+  appid: String,
+  name: String,
+  tags: [String]
+});
+const SteamGame = mongoose.models.SteamGame || mongoose.model('SteamGame', GameSchema);
+
+// --- 2. TAG DEFINITIONS ---
 const TAG_SYNONYMS = {
   "shooter": ["shooter", "fps", "first-person shooter", "third-person shooter", "sniper", "bullet hell", "shoot 'em up", "looter shooter", "tactical"],
   "story": ["story rich", "narrative", "visual novel", "rpg", "adventure", "interactive fiction", "lore", "choose your own adventure"],
   "scary": ["horror", "survival horror", "psychological horror", "zombies", "dark", "jump scare"],
   "multiplayer": ["multiplayer", "co-op", "coop", "online co-op", "local co-op", "mmo", "pvp", "online pvp", "team-based"],
   "chill": ["relaxing", "casual", "simulation", "walking simulator", "puzzle", "family friendly", "farming sim"],
-  "cars": ["racing", "driving", "automobile sim", "sports"],
-  "fight": ["fighting", "beat 'em up", "martial arts", "2d fighter", "competitive"],
-  "space": ["space", "sci-fi", "science fiction", "space sim", "aliens"]
+  "adult": ["nudity", "sexual content", "hentai", "nsfw", "adult only", "ecchi", "erotic", "mature", "romance", "dating sim"]
 };
 
-// --- 2. POPULAR GAMES FIX (The "Manual Override") ---
-// Fixes games that are missing tags in free CSV datasets
+const ADULT_KEYWORDS = ["nudity", "sexual", "hentai", "nsfw", "adult only", "ecchi", "erotic"];
+
+// --- 3. POPULAR GAMES FIX ---
 const POPULAR_GAMES_FIX = {
-  "10": ["action", "fps", "shooter", "competitive", "classic"], // Counter-Strike
-  "730": ["action", "fps", "shooter", "competitive", "esports"], // CS:GO
-  "240": ["action", "fps", "shooter", "classic"], // CS Source
-  "440": ["action", "fps", "shooter", "hero shooter", "multiplayer"], // Team Fortress 2
-  "570": ["action", "moba", "strategy", "multiplayer", "competitive"], // Dota 2
-  "578080": ["action", "fps", "shooter", "battle royale", "survival"], // PUBG
-  "271590": ["action", "open world", "crime", "shooter", "third-person shooter"], // GTA V
-  "359550": ["action", "fps", "shooter", "tactical"], // R6 Siege
-  "252490": ["survival", "open world", "crafting", "multiplayer", "fps"], // Rust
-  "1172470": ["action", "fps", "shooter", "battle royale", "hero shooter"], // Apex Legends
-  "230410": ["action", "frame", "ninja", "shooter", "third-person shooter"], // Warframe
-  "105600": ["sandbox", "adventure", "survival", "crafting"], // Terraria
-  "252950": ["action", "sports", "competitive", "driving", "cars"], // Rocket League
-  "292030": ["rpg", "open world", "story rich", "fantasy"], // Witcher 3
-  "1085660": ["action", "adventure", "story rich", "scary", "horror"], // Destiny 2
-  "397540": ["shooter", "looter shooter", "fps", "action", "rpg"], // Borderlands 3
-  "49520": ["shooter", "looter shooter", "fps", "action", "rpg"], // Borderlands 2
-  "218620": ["action", "heist", "shooter", "fps", "co-op"], // Payday 2
-  "550": ["action", "fps", "shooter", "zombies", "co-op"], // Left 4 Dead 2
-  "220": ["action", "fps", "shooter", "sci-fi", "story rich"] // Half-Life 2
+  "10": ["action", "fps", "shooter", "competitive"],
+  "730": ["action", "fps", "shooter", "competitive"],
+  "440": ["action", "fps", "shooter", "multiplayer"],
+  "570": ["action", "moba", "strategy", "multiplayer"],
+  "271590": ["action", "open world", "crime", "shooter"],
+  "359550": ["action", "fps", "shooter", "tactical"],
+  "1172470": ["action", "fps", "shooter", "battle royale"],
+  "252950": ["action", "sports", "competitive", "driving"],
 };
 
-// --- 3. LOAD CSV DATABASE ---
-const METADATA_PATH = path.join(__dirname, '../steam_metadata.csv');
-let GAME_DB = {};
-let IS_DB_READY = false;
-
-console.log("[PlayMatch] Starting to load CSV data...");
-
-fs.createReadStream(METADATA_PATH)
-  .pipe(csv())
-  .on('data', (row) => {
-    const appId = row.AppID || row.appid;
-    const name = row.Name || row.name;
-
-    // MAGNET LOGIC: Grab all text columns
-    const tagString = row.Tags || row.tags || "";
-    const genreString = row.Genres || row.genres || "";
-    const catString = row.Categories || row.categories || "";
-
-    const rawList = `${tagString},${genreString},${catString}`;
-
-    let tags = [];
-    if (rawList) {
-      tags = rawList.split(/[,;]/)
-        .map(t => t.trim())
-        .filter(t => t.length > 0 && t !== '0');
-    }
-
-    if (appId) {
-      // Store ID as string for easy lookup
-      GAME_DB[String(appId)] = {
-        name: name,
-        tags: [...new Set(tags)]
-      };
-    }
-  })
-  .on('end', () => {
-    IS_DB_READY = true;
-    console.log(`\n[PlayMatch] ✅ SYSTEM READY! Loaded metadata for ${Object.keys(GAME_DB).length} games.`);
-  });
-
-// --- HELPER: Shuffle ---
 function shuffleArray(array) {
   for (let i = array.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -103,13 +55,12 @@ function shuffleArray(array) {
 router.get('/recommendations/:identifier', async (req, res) => {
   try {
     const { identifier } = req.params;
-    const { mood } = req.query;
+    const { mood, includeAdult } = req.query;
     let steamId64;
 
-    if (!IS_DB_READY) return res.status(503).json({ error: 'Server booting. Try again in 5 seconds.' });
     if (!mood) return res.status(400).json({ error: 'Prompt is required.' });
 
-    // --- 4. Resolve Identifier ---
+    // --- Resolve ID ---
     if (/^7656\d{13}$/.test(identifier)) {
       steamId64 = identifier;
     } else {
@@ -126,7 +77,6 @@ router.get('/recommendations/:identifier', async (req, res) => {
       }
     }
 
-    // --- 5. Fetch Owned Games ---
     const ownedGamesUrl = `${STEAM_API_BASE}/IPlayerService/GetOwnedGames/v0001/`;
     const steamResponse = await axios.get(ownedGamesUrl, {
       params: { key: STEAM_API_KEY, steamid: steamId64, format: 'json', include_appinfo: 1, include_played_free_games: 1 },
@@ -136,18 +86,19 @@ router.get('/recommendations/:identifier', async (req, res) => {
       return res.status(404).json({ error: 'Library is private or empty.' });
     }
 
-    // --- 6. ENRICH DATA (Apply Manual Fixes Here) ---
-    const enrichedGames = steamResponse.data.response.games.map(game => {
+    let userGames = steamResponse.data.response.games;
+
+    // --- Batch Query MongoDB ---
+    const appIds = userGames.map(g => String(g.appid));
+    const gamesFromDb = await SteamGame.find({ appid: { $in: appIds } }).lean();
+
+    const dbMap = {};
+    gamesFromDb.forEach(g => { dbMap[g.appid] = g.tags; });
+
+    let enrichedGames = userGames.map(game => {
       const appIdString = String(game.appid);
-
-      // CHECK 1: Is it in our Popular Fix List? (Priority)
       let finalTags = POPULAR_GAMES_FIX[appIdString];
-
-      // CHECK 2: If not, check the CSV
-      if (!finalTags) {
-        const localData = GAME_DB[appIdString];
-        finalTags = localData ? localData.tags : [];
-      }
+      if (!finalTags) finalTags = dbMap[appIdString] || [];
 
       return {
         appid: game.appid,
@@ -157,56 +108,88 @@ router.get('/recommendations/:identifier', async (req, res) => {
       };
     }).filter(g => g.playtime_hours > 0.5);
 
+    // --- DEBUG: LOG TAGS ---
+    // This will print to your terminal so you can see if the tags are missing!
+    console.log("\n[DEBUG] Sample Game Tags from DB:",
+      enrichedGames.slice(0, 3).map(g => `${g.name}: [${g.tags.join(', ')}]`)
+    );
 
-    // --- 7. DECISION ENGINE ---
+    // --- FILTER: Remove Adult Content if Unchecked ---
+    if (includeAdult !== 'true') {
+      enrichedGames = enrichedGames.filter(g => {
+        if (!g.tags) return true;
+        const hasAdultTag = g.tags.some(tag => {
+          const lowerTag = tag.toLowerCase();
+          return ADULT_KEYWORDS.some(keyword => lowerTag.includes(keyword));
+        });
+        return !hasAdultTag;
+      });
+    }
+
+    // --- DECISION ENGINE ---
     let finalRecommendations = [];
-    const promptLower = mood.trim().toLowerCase();
+    let promptLower = mood.trim().toLowerCase();
 
-    // Get search terms
-    const searchTerms = TAG_SYNONYMS[promptLower] || [promptLower];
-    console.log(`\n[DEBUG] Searching for: "${promptLower}" using terms:`, searchTerms);
+    const isAdultSearch = ADULT_KEYWORDS.some(k => promptLower.includes(k)) || promptLower === 'adult';
+    const searchTerms = TAG_SYNONYMS[promptLower] || (isAdultSearch ? ADULT_KEYWORDS : [promptLower]);
 
-    // Filter Logic
+    console.log(`\n[DEBUG] Search: "${promptLower}" | Adult: ${includeAdult} | AI Bypass: ${isAdultSearch}`);
+
     const exactMatches = enrichedGames.filter(g => {
-      // Check Tags
       const hasTag = g.tags && g.tags.some(tag => searchTerms.some(term => tag.toLowerCase().includes(term)));
-      // Check Name (e.g. "Alien Shooter")
       const hasName = g.name.toLowerCase().includes(promptLower);
       return hasTag || hasName;
     });
 
+    // 1. Try Local First
     if (exactMatches.length >= 3) {
-      console.log(`[PlayMatch] Found ${exactMatches.length} local matches! Skipping AI.`);
+      console.log(`[PlayMatch] Found ${exactMatches.length} local matches.`);
       const selected = shuffleArray(exactMatches).slice(0, 9);
-
-      finalRecommendations = selected.map(g => {
-        const matchedTag = g.tags.find(tag => searchTerms.some(term => tag.toLowerCase().includes(term)));
-        const reason = matchedTag
-          ? `Matches your request for "${mood}" (Found tag: ${matchedTag})`
-          : `Matches your request because "${mood}" is in the title.`;
-
-        return { appid: g.appid, name: g.name, reason: reason };
-      });
+      finalRecommendations = selected.map(g => ({
+        appid: g.appid,
+        name: g.name,
+        reason: `Matches your request for "${mood}"`
+      }));
     } else {
-      console.log(`[PlayMatch] Only found ${exactMatches.length} matches. Asking Gemini...`);
-      const sample = shuffleArray(enrichedGames).slice(0, 150);
+      // 2. If Local Failed, Prepare AI Prompt
+      console.log(`[PlayMatch] Local failed (Found ${exactMatches.length}). Asking Gemini...`);
 
+      // --- SANITIZE PROMPT FOR ADULT SEARCHES ---
+      // If the user wants "Adult" but local failed, we ask Gemini for "Romance" to avoid the crash.
+      let safeMood = mood;
+      if (isAdultSearch) {
+        console.log("[PlayMatch] Sanitizing 'Adult' prompt for Gemini safety...");
+        safeMood = "Romance, Visual Novel, Mature Story, Dating Sim";
+      }
+
+      const sample = shuffleArray(enrichedGames).slice(0, 150);
       const aiPrompt = `
-        User Request: "${mood}"
+        User Request: "${safeMood}"
         Library Sample: ${JSON.stringify(sample)}
         Pick top 9 games matching the request. Return JSON with 'recommendations' array (appid, name, reason).
       `;
 
-      const result = await model.generateContent(aiPrompt);
-      const cleanJson = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
-      const data = JSON.parse(cleanJson);
-      finalRecommendations = data.recommendations;
+      try {
+        const result = await model.generateContent(aiPrompt);
+        const cleanJson = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+        if (!cleanJson.startsWith('{')) throw new Error("AI Refusal");
+        const data = JSON.parse(cleanJson);
+        finalRecommendations = data.recommendations;
+      } catch (aiError) {
+        console.log("[PlayMatch] Gemini Failed. Falling back to random.");
+        const randomBackup = shuffleArray(enrichedGames).slice(0, 9);
+        finalRecommendations = randomBackup.map(g => ({
+          appid: g.appid,
+          name: g.name,
+          reason: "AI unavailable - Here is a random pick!"
+        }));
+      }
     }
 
-    // --- 8. ADD IMAGES ---
+    // --- Add Images ---
     const resultWithImages = finalRecommendations.map(rec => ({
       ...rec,
-      image: `https://steamcdn-a.akamaihd.net/steam/apps/${rec.appid}/header.jpg`
+      image: rec.image || `https://steamcdn-a.akamaihd.net/steam/apps/${rec.appid}/header.jpg`
     }));
 
     res.json({ recommendations: resultWithImages });
