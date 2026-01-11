@@ -1,8 +1,10 @@
-/* client/src/App.css */
 :root {
   --bg-color: #121212;
   --card-bg: #1e1e1e;
   --accent: #00d4ff;
+  /* Cyan */
+  --accent-2: #ff5500;
+  /* Neon Orange */
   --text-main: #ffffff;
   --text-secondary: #b3b3b3;
 }
@@ -10,9 +12,9 @@
 body {
   background-color: var(--bg-color);
   color: var(--text-main);
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   margin: 0;
-  padding: 0;
+  padding: 2rem;
   display: flex;
   justify-content: center;
   min-height: 100vh;
@@ -20,96 +22,246 @@ body {
 
 .App {
   width: 100%;
-  max-width: 1200px;
-  /* Increased max-width for the 3-column grid */
-  padding: 2rem;
+  max-width: 95vw;
+  /* FIX: Uses 95% of screen width instead of fixed pixels */
   text-align: center;
 }
 
+/* --- DASHBOARD LAYOUT (3 Columns) --- */
+.dashboard-layout {
+  display: grid;
+  grid-template-columns: 300px 1fr 300px;
+  /* Made sidebars slightly wider (280 -> 300) */
+  gap: 2rem;
+  width: 100%;
+  max-width: 100%;
+  /* Let it fill the .App container */
+  margin: 0 auto;
+  align-items: stretch;
+  min-height: 80vh;
+}
+
+.main-content {
+  width: 100%;
+  min-width: 0;
+  /* Prevents grid blowout */
+}
+
 h1 {
-  font-size: 3rem;
-  margin-bottom: 0.5rem;
+  font-size: 3.5rem;
+  margin-bottom: 1rem;
   background: linear-gradient(90deg, #00d4ff, #00ff88);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
+  font-weight: 800;
 }
 
-.search-box {
+/* --- SEARCH SECTION --- */
+.search-card {
   background: var(--card-bg);
-  padding: 2rem;
+  padding: 2.5rem;
   border-radius: 16px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   margin-bottom: 3rem;
   display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  max-width: 800px;
-  /* Keep search box focused */
+  flex-wrap: wrap;
+  gap: 1.5rem;
   margin-left: auto;
   margin-right: auto;
+  align-items: center;
+  justify-content: center;
 }
 
-input {
+input[type='text'] {
   background: #2a2a2a;
-  border: 1px solid #333;
-  padding: 1rem;
+  border: 1px solid #383838;
+  padding: 1rem 1.2rem;
   border-radius: 8px;
   color: white;
   font-size: 1rem;
   outline: none;
-  transition: 0.2s;
+  transition: all 0.2s ease-in-out;
+  flex: 1;
+  min-width: 200px;
 }
 
-input:focus {
+input[type='text']:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.2);
+  box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.25);
 }
 
+/* --- BUTTONS --- */
 button {
   background: var(--accent);
   color: #000;
   font-weight: bold;
-  padding: 1rem;
+  padding: 1rem 1.5rem;
   border: none;
   border-radius: 8px;
   cursor: pointer;
   font-size: 1rem;
-  transition: transform 0.1s;
+  transition: all 0.2s ease;
+  white-space: nowrap;
 }
 
-button:active {
-  transform: scale(0.98);
+button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 212, 255, 0.3);
+}
+
+button:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: none;
 }
 
 button:disabled {
-  opacity: 0.7;
+  opacity: 0.6;
   cursor: not-allowed;
 }
 
-/* --- UPDATED GRID & CARDS --- */
+.primary-btn {
+  background: var(--accent);
+}
 
+.roulette-btn {
+  background: var(--accent-2);
+  color: white;
+}
+
+.roulette-btn:hover:not(:disabled) {
+  box-shadow: 0 4px 12px rgba(255, 85, 0, 0.4);
+}
+
+.stats-btn {
+  background: #2b2b2b;
+  color: #fff;
+  border: 1px solid #444;
+}
+
+.stats-btn:hover:not(:disabled) {
+  background: #333;
+  border-color: #fff;
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
+}
+
+/* --- SIDEBAR STYLES (MOVED OUT OF MEDIA QUERY) --- */
+.sidebar {
+  background: rgba(30, 30, 40, 0.5);
+  border: 1px solid #333;
+  border-radius: 16px;
+  padding: 1.5rem;
+
+  /* --- FIX: Full Height & No Sticky --- */
+  height: 100%;
+  min-height: 80vh;
+  position: static;
+
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar h3 {
+  margin-top: 0;
+  color: var(--accent);
+  font-size: 1.2rem;
+  border-bottom: 1px solid #444;
+  padding-bottom: 10px;
+  margin-bottom: 15px;
+  text-align: left;
+}
+
+.sidebar-placeholder {
+  color: #666;
+  font-style: italic;
+  font-size: 0.9rem;
+}
+
+/* Recent Games List */
+.recent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.recent-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #252525;
+  padding: 8px;
+  border-radius: 8px;
+  transition: transform 0.2s;
+}
+
+.recent-card:hover {
+  transform: translateX(5px);
+  background: #333;
+}
+
+.recent-card img {
+  width: 50px;
+  height: 25px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.recent-info {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.recent-info span {
+  font-size: 0.85rem;
+  font-weight: bold;
+  color: #eee;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
+.recent-info small {
+  font-size: 0.7rem;
+  color: #888;
+}
+
+/* Quick Vibes Chips */
+.vibes-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  /* Centers the chips */
+}
+
+.vibe-chip {
+  background: #2a2a2a;
+  border: 1px solid #444;
+  color: #ccc;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.vibe-chip:hover {
+  background: var(--accent);
+  color: #000;
+  border-color: var(--accent);
+  transform: scale(1.05);
+}
+
+/* --- RESULTS GRID --- */
 .results-grid {
   display: grid;
-  /* FORCE 3 columns on desktop */
-  grid-template-columns: repeat(3, 1fr);
-  gap: 2rem;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1.5rem;
   width: 100%;
-  margin: 0 auto;
-}
-
-/* Tablet: 2 Columns */
-@media (max-width: 1000px) {
-  .results-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-/* Mobile: 1 Column */
-@media (max-width: 600px) {
-  .results-grid {
-    grid-template-columns: 1fr;
-  }
+  padding-top: 20px;
+  align-items: start;
 }
 
 .game-card {
@@ -117,56 +269,51 @@ button:disabled {
   border-radius: 12px;
   overflow: hidden;
   text-align: left;
-  border: 1px solid #333;
-  transition: transform 0.2s, box-shadow 0.2s;
+  border: 1px solid #383838;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
   display: flex;
   flex-direction: column;
   height: 100%;
-  min-height: 380px;
-  /* <--- CRITICAL FIX: Forces all cards to be tall */
+  width: 100%;
+  margin: 0;
 }
 
 .game-card:hover {
-  transform: translateY(-5px);
+  transform: translateY(-8px);
   border-color: var(--accent);
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.5);
 }
 
 .card-image {
   width: 100%;
-  height: 160px;
-  /* Slightly taller image */
+  height: 150px;
   background-size: cover;
   background-position: center;
-  border-bottom: 1px solid #333;
-  background-color: #000;
+  border-bottom: 1px solid #383838;
 }
 
 .card-content {
-  padding: 1.5rem;
+  padding: 1.2rem;
   display: flex;
   flex-direction: column;
   flex-grow: 1;
-  justify-content: flex-start;
-  /* Aligns text to top */
 }
 
 .game-title {
-  font-size: 1.3rem;
-  margin: 0 0 0.8rem 0;
-  color: var(--accent);
+  font-size: 1.2rem;
+  margin: 0 0 0.5rem 0;
+  color: var(--text-main);
   font-weight: 700;
-  line-height: 1.2;
 }
 
 .ai-reason {
   color: var(--text-secondary);
   line-height: 1.5;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
 }
 
 .error-msg {
-  color: #ff4444;
+  color: #ff5959;
   margin-top: 1rem;
   font-weight: bold;
 }
@@ -174,19 +321,144 @@ button:disabled {
 .loading {
   font-size: 1.2rem;
   color: var(--accent);
-  animation: pulse 1.5s infinite;
+  margin-top: 2rem;
 }
 
-@keyframes pulse {
-  0% {
-    opacity: 0.5;
+/* --- WHEEL OVERLAY --- */
+.wheel-overlay {
+  margin: 40px auto;
+  display: flex;
+  justify-content: center;
+  animation: fadeIn 0.5s ease;
+}
+
+/* --- WINNER MODAL --- */
+.winner-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+  backdrop-filter: blur(8px);
+  animation: fadeIn 0.4s ease;
+}
+
+.winner-card {
+  background: #1a1a1a;
+  border-radius: 20px;
+  border: 1px solid var(--accent-2);
+  box-shadow: 0 0 60px rgba(255, 85, 0, 0.15);
+  max-width: 500px;
+  width: 90%;
+  text-align: center;
+  padding: 30px;
+  animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.winner-card img {
+  width: 100%;
+  border-radius: 12px;
+  margin: 20px 0;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.winner-card h2 {
+  color: var(--accent-2);
+  margin: 0;
+  font-size: 1.8rem;
+}
+
+.winner-card h3 {
+  color: white;
+  font-size: 1.5rem;
+  margin: 10px 0;
+}
+
+.winner-card p {
+  color: #bbb;
+  margin-bottom: 25px;
+  line-height: 1.6;
+}
+
+.winner-actions {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+}
+
+.close-btn {
+  background: transparent;
+  border: 1px solid #555;
+  color: #fff;
+}
+
+.close-btn:hover {
+  background: #333;
+  border-color: #fff;
+}
+
+/* Global Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
   }
 
-  50% {
+  to {
     opacity: 1;
   }
+}
 
-  100% {
-    opacity: 0.5;
+@keyframes popIn {
+  from {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* --- STATS OVERLAY UTILS --- */
+.exit-btn-top-right {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: transparent;
+  color: #666;
+  border: 1px solid #333;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.exit-btn-top-right:hover {
+  color: white;
+  border-color: white;
+  background: transparent;
+  transform: scale(1.1);
+  box-shadow: none;
+}
+
+/* --- MOBILE RESPONSIVENESS (Correctly Placed at Bottom) --- */
+@media (max-width: 1100px) {
+  .dashboard-layout {
+    grid-template-columns: 1fr;
+    padding: 1rem;
+  }
+
+  .sidebar {
+    display: none;
+    /* Hide sidebars on smaller screens */
   }
 }

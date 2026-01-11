@@ -1,0 +1,94 @@
+.stats-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    backdrop-filter: blur(8px);
+    animation: fadeIn 0.3s ease;
+}
+
+.stats-card {
+    background: #121212;
+    border: 1px solid #333;
+    border-radius: 20px;
+    padding: 30px;
+    width: 90%;
+    max-width: 800px;
+    position: relative;
+    box-shadow: 0 0 50px rgba(0, 212, 255, 0.1);
+}
+
+.stats-card h2 {
+    color: white;
+    margin-top: 0;
+    text-align: center;
+    font-size: 2rem;
+    background: linear-gradient(90deg, #fff, #999);
+
+    /* --- FIX: Added standard property --- */
+    background-clip: text;
+    -webkit-background-clip: text;
+
+    -webkit-text-fill-color: transparent;
+}
+
+.stats-header {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    margin: 30px 0;
+    border-bottom: 1px solid #222;
+    padding-bottom: 20px;
+}
+
+.stat-box {
+    text-align: center;
+}
+
+.stat-box h3 {
+    font-size: 2.5rem;
+    margin: 0;
+    color: #00d4ff;
+}
+
+.stat-box p {
+    color: #888;
+    margin: 5px 0 0 0;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 1px;
+}
+
+.charts-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.chart-section {
+    flex: 1;
+    min-width: 300px;
+    background: #1a1a1a;
+    border-radius: 12px;
+    padding: 20px;
+}
+
+.chart-section h4 {
+    color: #ccc;
+    text-align: center;
+    margin-top: 0;
+}
+
+.legend {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    font-size: 0.9rem;
+    margin-top: 10px;
+}
