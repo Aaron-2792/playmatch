@@ -1,19 +1,27 @@
 // server/index.js
-
-// Load environment variables from .env file immediately
 require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const mongoose = require('mongoose');
 
-// Import and run our database connection
-const connectDB = require('./config/db');
-connectDB();
+const app = express();
+const PORT = process.env.PORT || 5000;
 
-// Import the configured express app from app.js
-const app = require('./app');
+// 1. Middleware
+app.use(cors());
+app.use(express.json());
 
-// Define the port, falling back to 5000
-const port = process.env.PORT || 5000;
+// 2. Connect to MongoDB
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log("[PlayMatch] ✅ Connected to MongoDB"))
+  .catch(err => console.error("[PlayMatch] ❌ MongoDB Error:", err));
 
-// Start the server
-app.listen(port, () => {
-  console.log(`PlayMatch server listening at http://localhost:${port}`);
+// 3. Routes (THIS IS THE IMPORTANT PART)
+// We tell the server: "Any URL starting with /api, go look in api.js"
+const apiRoutes = require('./routes/api');
+app.use('/api', apiRoutes);
+
+// 4. Start Server
+app.listen(PORT, () => {
+  console.log(`[PlayMatch] 🚀 Server running on port ${PORT}`);
 });
