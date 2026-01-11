@@ -1,7 +1,16 @@
-# .gitignore file
+# Dependency directories
+node_modules/
+client/node_modules/
+server/node_modules/
 
-# Ignore all node modules
-node_modules
-
-# Ignore the environment file with our secrets!
+# Environment variables (SECURITY RISK)
 .env
+.env.local
+server/.env
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Optional: Ignore the big CSV if it's over 100MB (GitHub limit)
+steam_metadata.csv
