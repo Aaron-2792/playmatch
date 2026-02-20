@@ -3,6 +3,8 @@ import './App.css';
 import RouletteWheel from './components/RouletteWheel';
 import SteamStats from './components/SteamStats';
 
+const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
 function App() {
   const [steamId, setSteamId] = useState('');
   const [mood, setMood] = useState('');
@@ -27,7 +29,7 @@ function App() {
   // --- NEW: Helper to load Sidebar Data ---
   const loadSidebarData = async (id) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/recent/${id}`);
+      const res = await fetch(`${API_BASE}/api/recent/${id}`);
       const data = await res.json();
       if (res.ok) setRecentGames(data.games);
     } catch (err) {
@@ -64,7 +66,7 @@ function App() {
       if (recentGames.length === 0) loadSidebarData(cleanId);
 
       const response = await fetch(
-        `http://localhost:5000/api/recommendations/${cleanId}?mood=${encodeURIComponent(searchMood)}`
+        `${API_BASE}/api/recommendations/${cleanId}?mood=${encodeURIComponent(searchMood)}`
       );
 
       const data = await response.json();
@@ -108,7 +110,7 @@ function App() {
       // Load sidebar data if not already loaded
       if (recentGames.length === 0) loadSidebarData(cleanId);
 
-      const response = await fetch(`http://localhost:5000/api/roulette/${cleanId}`);
+      const response = await fetch(`${API_BASE}/api/roulette/${cleanId}`);
       const data = await response.json();
 
       if (!response.ok) throw new Error(data.error || 'Roulette failed');
@@ -147,7 +149,7 @@ function App() {
         cleanId = parts[parts.length - 1];
       }
 
-      const res = await fetch(`http://localhost:5000/api/stats/${cleanId}`);
+      const res = await fetch(`${API_BASE}/api/stats/${cleanId}`);
       const data = await res.json();
 
       if (!res.ok) throw new Error(data.error);
