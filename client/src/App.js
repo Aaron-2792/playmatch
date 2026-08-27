@@ -25,6 +25,7 @@ function App() {
 
   // Sidebars State
   const [recentGames, setRecentGames] = useState([]);
+  const [ownedGames, setOwnedGames] = useState([]);
 
   // Roulette States
   const [rouletteResult, setRouletteResult] = useState(null);
@@ -40,9 +41,15 @@ function App() {
   // --- NEW: Helper to load Sidebar Data ---
   const loadSidebarData = async (id) => {
     try {
-      const res = await fetch(`${API_BASE}/api/recent/${id}`);
-      const data = await res.json();
-      if (res.ok) setRecentGames(data.games);
+      const [recentResponse, libraryResponse] = await Promise.all([
+        fetch(`${API_BASE}/api/recent/${id}`),
+        fetch(`${API_BASE}/api/user-games/${id}`)
+      ]);
+      const recentData = await recentResponse.json();
+      const libraryData = await libraryResponse.json();
+
+      if (recentResponse.ok) setRecentGames(recentData.games);
+      if (libraryResponse.ok) setOwnedGames(libraryData.games);
     } catch (err) {
       console.error("Sidebar load failed", err);
     }
@@ -296,32 +303,28 @@ function App() {
             {isLoading && <GamingLoader />}
             {!isLoading && recommendations.map(game => <GameCard key={game.appid} game={game} />)}
           </div>
+
+          {ownedGames.length > 0 && (
+            <section className="hall-of-fame" aria-labelledby="hall-of-fame-title">
+              <div className="section-heading">
+                <h2 id="hall-of-fame-title">Your Hall of Fame</h2>
+                <span>Most played from your library</span>
+              </div>
+              <div className="hall-of-fame-grid">
+                {[...ownedGames]
+                  .sort((firstGame, secondGame) => secondGame.playtime_forever - firstGame.playtime_forever)
+                  .slice(0, 10)
+                  .map(game => <GameCard key={game.appid} game={game} />)}
+              </div>
+            </section>
+          )}
         </main>
 
         {/* RIGHT SIDEBAR: QUICK PICKS */}
         <aside className="sidebar right-sidebar">
           <h3>Quick Picks</h3>
           <div className="vibes-grid">
-            {[
-              // Genres
-              'RPG', 'FPS', 'RTS', 'MOBA', 'MMO', 'Roguelike', 'Metroidvania',
-              'Platformer', 'Fighting', 'Racing', 'Sports', 'Puzzle', 'Strategy',
-              'Simulation', 'Survival', 'Horror', 'Battle Royale', 'Visual Novel',
-
-              // Vibes & Moods
-              'Cozy', 'Relaxing', 'Chaos', 'Rage-Quit', 'Hardcore', 'Casual',
-              'Competitive', 'Funny', 'Dark', 'Wholesome', 'Atmospheric',
-              'Story Rich', 'Fast-Paced', 'Slow Burn', 'Nostalgia',
-
-              // Themes
-              'Cyberpunk', 'Steampunk', 'Sci-Fi', 'Space', 'Fantasy', 'Medieval',
-              'Zombies', 'Vampires', 'Post-Apocalyptic', 'Military', 'Aliens',
-              'Noir', 'Mystery',
-
-              // Mechanics & Tech
-              'Open World', 'Sandbox', 'Crafting', 'Turn-Based', 'Hack & Slash',
-              'Looter Shooter', 'Stealth', 'Co-op', 'PvP', 'VR', 'Pixel Art'
-            ].map(vibe => (
+            {['Action', 'RPG', 'Strategy', 'Co-Op', 'Sci-Fi', 'Horror', 'Cozy', 'Simulation'].map(vibe => (
               <button key={vibe} className="vibe-chip" onClick={() => handleQuickSearch(vibe)} disabled={isLoading || isSpinning}>
                 {vibe}
               </button>

@@ -14,7 +14,7 @@ function GameCard({ game }) {
 
       <div className="game-card__content">
         <h2 className="game-card__title">{game.name}</h2>
-        <p className="game-card__reason">{game.reason}</p>
+        {game.reason && <p className="game-card__reason">{game.reason}</p>}
         <PlaytimeMetrics game={game} />
       </div>
     </article>

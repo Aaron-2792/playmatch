@@ -164,7 +164,8 @@ button:disabled {
 .sidebar h3 {
   margin-top: 0;
   color: var(--accent);
-  font-size: 1.2rem;
+  font-size: 1.5rem;
+  font-weight: 800;
   border-bottom: 1px solid #444;
   padding-bottom: 10px;
   margin-bottom: 15px;
@@ -266,6 +267,43 @@ button:disabled {
 
 .results-grid--loading {
   filter: saturate(0.75);
+}
+
+.hall-of-fame {
+  margin-top: 3.5rem;
+  text-align: left;
+}
+
+.section-heading {
+  align-items: baseline;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+
+.section-heading h2 {
+  color: var(--text-main);
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin: 0;
+}
+
+.section-heading span {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.hall-of-fame-grid {
+  display: flex;
+  gap: 1.25rem;
+  overflow-x: auto;
+  padding: 0.25rem 0.25rem 1rem;
+  scrollbar-color: #555 transparent;
+}
+
+.hall-of-fame-grid .game-card {
+  flex: 0 0 240px;
 }
 
 .error-msg {
