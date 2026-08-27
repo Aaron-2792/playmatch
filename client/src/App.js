@@ -20,6 +20,7 @@ function App() {
   const [steamId, setSteamId] = useState('');
   const [mood, setMood] = useState('');
   const [showUnplayedOnly, setShowUnplayedOnly] = useState(false);
+  const [sessionTime, setSessionTime] = useState('');
   const [recommendations, setRecommendations] = useState([]);
   const [hasSearched, setHasSearched] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -35,6 +36,10 @@ function App() {
   const [isSpinning, setIsSpinning] = useState(false);
   const [wheelGames, setWheelGames] = useState([]);
   const [spinKey, setSpinKey] = useState(0);
+  const [rouletteUnplayedOnly, setRouletteUnplayedOnly] = useState(false);
+  const [rouletteUnderTenHours, setRouletteUnderTenHours] = useState(false);
+  const [rouletteMultiplayer, setRouletteMultiplayer] = useState(false);
+  const [rouletteFilterError, setRouletteFilterError] = useState('');
 
   // Stats States
   const [stats, setStats] = useState(null);
@@ -147,24 +152,40 @@ function App() {
     setTargetGame(null);
     setWheelGames([]);
     setError(null);
-    setIsSpinning(true);
-    setSpinKey(prev => prev + 1);
+    setRouletteFilterError('');
 
     try {
       const cleanId = normalizeSteamId(steamId);
+      let library = ownedGames;
 
-      // Load sidebar data if not already loaded
-      if (recentGames.length === 0) loadSidebarData(cleanId);
+      if (library.length === 0) {
+        const response = await fetch(`${API_BASE}/api/user-games/${cleanId}`);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Unable to load your Steam library.');
+        library = data.games;
+        setOwnedGames(library);
+      }
 
-      const response = await fetch(`${API_BASE}/api/roulette/${cleanId}`);
-      const data = await response.json();
+      const candidates = library.filter(game => {
+        const playtime = Number(game.playtime_forever || 0);
+        const tags = Array.isArray(game.tags) ? game.tags.map(tag => tag.toLowerCase()) : [];
+        const matchesUnplayed = !rouletteUnplayedOnly || playtime === 0;
+        const matchesShortSession = !rouletteUnderTenHours || (playtime > 0 && playtime < 600);
+        const matchesMultiplayer = !rouletteMultiplayer || tags.some(tag => tag.includes('multiplayer') || tag.includes('co-op') || tag.includes('coop'));
+        return matchesUnplayed && matchesShortSession && matchesMultiplayer;
+      });
 
-      if (!response.ok) throw new Error(data.error || 'Roulette failed');
+      if (candidates.length === 0) {
+        setRouletteFilterError('No games match these filters!');
+        return;
+      }
 
-      const winner = data.recommendation;
-      const fillers = data.recommendation.fillers || [];
+      setIsSpinning(true);
+      setSpinKey(prev => prev + 1);
+      const shuffledCandidates = [...candidates].sort(() => 0.5 - Math.random());
+      const winner = shuffledCandidates[0];
 
-      setWheelGames([winner, ...fillers]);
+      setWheelGames([winner, ...shuffledCandidates.slice(1, 10)]);
       setTargetGame(winner);
 
       setTimeout(() => {
@@ -177,6 +198,14 @@ function App() {
       setIsSpinning(false);
     }
   };
+
+  const rouletteCandidates = ownedGames.filter(game => {
+    const playtime = Number(game.playtime_forever || 0);
+    const tags = Array.isArray(game.tags) ? game.tags.map(tag => tag.toLowerCase()) : [];
+    return (!rouletteUnplayedOnly || playtime === 0)
+      && (!rouletteUnderTenHours || (playtime > 0 && playtime < 600))
+      && (!rouletteMultiplayer || tags.some(tag => tag.includes('multiplayer') || tag.includes('co-op') || tag.includes('coop')));
+  });
 
   const handleStats = async () => {
     if (!steamId) {
@@ -274,17 +303,35 @@ function App() {
               </div>
             </div>
 
+            <div className="roulette-filter-row" aria-label="Roulette filters">
+              <span className="roulette-filter-label">Roulette filters</span>
+              <label className="filter-pill">
+                <input type="checkbox" checked={rouletteUnplayedOnly} onChange={(e) => setRouletteUnplayedOnly(e.target.checked)} disabled={isLoading || isSpinning} />
+                <span>Unplayed Only</span>
+              </label>
+              <label className="filter-pill">
+                <input type="checkbox" checked={rouletteUnderTenHours} onChange={(e) => setRouletteUnderTenHours(e.target.checked)} disabled={isLoading || isSpinning} />
+                <span>Under 10 Hours</span>
+              </label>
+              <label className="filter-pill">
+                <input type="checkbox" checked={rouletteMultiplayer} onChange={(e) => setRouletteMultiplayer(e.target.checked)} disabled={isLoading || isSpinning} />
+                <span>Multiplayer</span>
+              </label>
+            </div>
+
             <div className="button-group">
               <button className="btn primary-btn" onClick={handleSearch} disabled={isLoading || isSpinning}>
                 {isLoading ? 'Analyzing...' : 'Find Games'}
               </button>
-              <button className="btn roulette-btn" onClick={handleRoulette} disabled={isLoading || isSpinning}>
+              <button className="btn roulette-btn" onClick={handleRoulette} disabled={isLoading || isSpinning || (ownedGames.length > 0 && rouletteCandidates.length === 0)}>
                 {isSpinning ? '🎲 Surprise Me' : '🎲 Surprise Me'}
               </button>
               <button className="btn stats-btn" onClick={handleStats} disabled={isLoading || isSpinning}>
                 🎮 Profile DNA
               </button>
             </div>
+
+            {rouletteFilterError && <div className="roulette-filter-error" role="status">{rouletteFilterError}</div>}
 
             {error && <div className="error-msg">{error}</div>}
           </div>
@@ -347,6 +394,21 @@ function App() {
 
         {/* RIGHT SIDEBAR: QUICK PICKS */}
         <aside className="sidebar right-sidebar">
+          <div className="session-picker">
+            <h3>Session Time</h3>
+            <div className="session-options">
+              {['15 Min Quick Hit', '1 Hour Session', 'All-Night Binge'].map(session => (
+                <button
+                  key={session}
+                  className={`session-option ${sessionTime === session ? 'session-option--active' : ''}`}
+                  onClick={() => { setSessionTime(session); handleQuickSearch(session); }}
+                  disabled={isLoading || isSpinning}
+                >
+                  {session}
+                </button>
+              ))}
+            </div>
+          </div>
           <h3>Quick Picks</h3>
           <div className="vibes-grid">
             {['Action', 'RPG', 'Strategy', 'Co-Op', 'Sci-Fi', 'Horror', 'Cozy', 'Simulation', 'FPS', 'Open World', 'Survival', 'Indie', 'Roguelike', 'Platformer', 'Puzzle', 'Story Rich', 'Casual', 'Cyberpunk', 'Card & Board', 'Sports & Racing'].map(vibe => (

@@ -178,6 +178,55 @@ input[type='text']:focus {
   justify-content: center;
 }
 
+.roulette-filter-row {
+  align-items: center;
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: center;
+}
+
+.roulette-filter-label {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.filter-pill {
+  align-items: center;
+  border: 1px solid #444;
+  border-radius: 999px;
+  color: #ccc;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 0.82rem;
+  gap: 0.45rem;
+  padding: 0.45rem 0.7rem;
+  transition: background 180ms ease, border-color 180ms ease, color 180ms ease;
+}
+
+.filter-pill input {
+  accent-color: var(--accent);
+  height: 1rem;
+  margin: 0;
+  width: 1rem;
+}
+
+.filter-pill:has(input:checked) {
+  background: rgba(0, 212, 255, 0.14);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.roulette-filter-error {
+  color: #ff9b78;
+  flex: 1 1 100%;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-align: center;
+}
+
 /* --- BUTTONS --- */
 button {
   background: var(--accent);
@@ -258,6 +307,41 @@ button:disabled {
   padding-bottom: 10px;
   margin-bottom: 15px;
   text-align: left;
+}
+
+.session-picker {
+  border-bottom: 1px solid #444;
+  margin-bottom: 1.25rem;
+  padding-bottom: 1.25rem;
+}
+
+.session-picker h3 {
+  border-bottom: 0;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0;
+}
+
+.session-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.session-option {
+  background: transparent;
+  border: 1px solid #555;
+  color: #ccc;
+  font-size: 0.88rem;
+  padding: 0.7rem 0.75rem;
+  text-align: left;
+  transition: background 180ms ease, border-color 180ms ease, color 180ms ease;
+}
+
+.session-option:hover:not(:disabled),
+.session-option--active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #000;
 }
 
 .sidebar-placeholder {

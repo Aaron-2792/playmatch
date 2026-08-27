@@ -120,7 +120,10 @@ const QUICK_PICK_TAG_GROUPS = {
   casual: ['casual', 'family friendly', 'arcade', 'minigames', 'simple'],
   cyberpunk: ['cyberpunk', 'sci-fi', 'futuristic', 'hacker', 'dystopian', 'high tech'],
   'card board': ['card game', 'deckbuilding', 'board game', 'tabletop', 'strategy'],
-  'sports racing': ['sports', 'racing', 'driving', 'automobile', 'sim racing', 'football', 'soccer']
+  'sports racing': ['sports', 'racing', 'driving', 'automobile', 'sim racing', 'football', 'soccer'],
+  '15 min quick hit': ['arcade', 'casual', 'fighting', 'roguelike', 'platformer'],
+  '1 hour session': ['action', 'fps', 'puzzle', 'indie'],
+  'all night binge': ['rpg', 'open world', 'strategy', 'simulation', 'mmo']
 };
 
 const RESTRICTED_KEYWORDS = ["nudity", "sexual", "hentai", "nsfw", "adult only", "ecchi", "erotic", "18+"];
