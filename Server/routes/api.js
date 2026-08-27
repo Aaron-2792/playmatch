@@ -9,7 +9,7 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const STEAM_API_BASE = 'http://api.steampowered.com';
 
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+const model = genAI.getGenerativeModel({ model: "gemini-3.7-flash" });
 
 // --- 1. MONGO SCHEMA ---
 const GameSchema = new mongoose.Schema({
@@ -211,7 +211,7 @@ router.get('/recommendations/:identifier', async (req, res) => {
       return res.status(404).json({ error: 'Library is private or empty.' });
     }
 
-    let userGames = steamResponse.data.response.games;
+    const userGames = steamResponse.data.response.games;
     const initialCount = userGames.length;
     console.log(`\n[DEBUG] Steam returned ${initialCount} total items.`);
 
@@ -354,7 +354,7 @@ router.get('/user-games/:identifier', async (req, res) => {
       return res.status(404).json({ error: 'Library is private or empty.' });
     }
 
-    let userGames = steamResponse.data.response.games;
+    const userGames = steamResponse.data.response.games;
 
     const appIds = userGames.map(g => String(g.appid));
     const gamesFromDb = await SteamGame.find({ appid: { $in: appIds } }).lean();
@@ -362,7 +362,7 @@ router.get('/user-games/:identifier', async (req, res) => {
     const dbMap = {};
     gamesFromDb.forEach(g => { dbMap[g.appid] = g.tags; });
 
-    let cleanGames = userGames.map(game => {
+    const cleanGames = userGames.map(game => {
       const appIdString = String(game.appid);
       let finalTags = POPULAR_GAMES_FIX[appIdString];
       if (!finalTags) finalTags = dbMap[appIdString] || [];
@@ -413,14 +413,14 @@ router.get('/roulette/:identifier', async (req, res) => {
       return res.status(404).json({ error: 'Library is private or empty.' });
     }
 
-    let userGames = steamResponse.data.response.games;
+    const userGames = steamResponse.data.response.games;
     const appIds = userGames.map(g => String(g.appid));
     const gamesFromDb = await SteamGame.find({ appid: { $in: appIds } }).lean();
 
     const dbMap = {};
     gamesFromDb.forEach(g => { dbMap[g.appid] = g.tags; });
 
-    let cleanGames = userGames.map(game => {
+    const cleanGames = userGames.map(game => {
       const appIdString = String(game.appid);
       let finalTags = POPULAR_GAMES_FIX[appIdString];
       if (!finalTags) finalTags = dbMap[appIdString] || [];
@@ -494,7 +494,7 @@ router.get('/stats/:identifier', async (req, res) => {
       return res.status(404).json({ error: 'Library is private or empty.' });
     }
 
-    let userGames = steamResponse.data.response.games;
+    const userGames = steamResponse.data.response.games;
 
     // 3. Enrich with Tags
     const appIds = userGames.map(g => String(g.appid));

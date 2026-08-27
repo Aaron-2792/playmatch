@@ -1,0 +1,12 @@
+# Environment-specific configuration and credentials
+.env*
+!.env.example
+
+# Dependencies and generated output
+node_modules/
+build/
+coverage/
+
+# Local tooling files
+.DS_Store
+*.log

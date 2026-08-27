@@ -44,7 +44,7 @@ const SteamStats = ({ stats, onClose }) => {
                                         paddingAngle={5}
                                         dataKey="value"
                                     >
-                                        {playData.map((entry, index) => (
+                                        {playData.map((_, index) => (
                                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                         ))}
                                     </Pie>
