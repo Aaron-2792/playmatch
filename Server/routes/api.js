@@ -3,17 +3,16 @@ const axios = require('axios');
 const rateLimit = require('express-rate-limit');
 const mongoose = require('mongoose');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const { withExponentialBackoff } = require('../utils/exponentialBackoff');
 const router = express.Router();
 
 const STEAM_API_KEY = process.env.STEAM_API_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const STEAM_API_BASE = 'http://api.steampowered.com';
-const PRIMARY_MODEL = 'gemini-3.7-flash';
-const FALLBACK_MODEL = 'gemini-3.5-flash';
+const STEAM_STORE_API_BASE = 'https://store.steampowered.com/api';
+const GEMINI_MODEL = 'gemini-3.5-flash';
 
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const primaryModel = genAI.getGenerativeModel({ model: PRIMARY_MODEL });
+const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
 
 const aiSearchLimiter = rateLimit({
   windowMs: 900000,
@@ -100,6 +99,13 @@ const TAG_SYNONYMS = {
   "pixel art": ["pixel art", "retro", "2d", "indie", "8-bit", "16-bit"]
 };
 
+const QUICK_PICK_TAG_GROUPS = {
+  ...TAG_SYNONYMS,
+  strategy: ['strategy', 'real-time strategy', 'turn-based strategy', '4x', 'tactical'],
+  'co-op': ['co-op', 'online co-op', 'local co-op', 'multiplayer', 'split screen', 'team-based'],
+  'sci-fi': ['sci-fi', 'science fiction', 'space', 'futuristic', 'aliens', 'robots']
+};
+
 const RESTRICTED_KEYWORDS = ["nudity", "sexual", "hentai", "nsfw", "adult only", "ecchi", "erotic", "18+"];
 const BANNED_TITLE_WORDS = ["sakura", "sex", "hentai", "nude", "uncensored", "breeding", "lewd", "oppai", "ecchi", "porn"];
 
@@ -180,6 +186,100 @@ function validateAIRecommendations(aiRecommendations, userLibrary) {
   });
 }
 
+function minutesToHours(minutes = 0) {
+  return Math.round((minutes / 60) * 10) / 10;
+}
+
+function getPlaytimeMetrics(game) {
+  const playtime_forever = game.playtime_forever || 0;
+  const playtime_2weeks = game.playtime_2weeks || 0;
+
+  return {
+    playtime_forever,
+    playtime_2weeks,
+    playtime_hours: minutesToHours(playtime_forever),
+    playtime_2weeks_hours: minutesToHours(playtime_2weeks)
+  };
+}
+
+function normalizeTag(value) {
+  return String(value).toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function levenshteinDistance(first, second) {
+  const previousRow = Array.from({ length: second.length + 1 }, (_, index) => index);
+
+  for (let firstIndex = 1; firstIndex <= first.length; firstIndex += 1) {
+    let previousDiagonal = previousRow[0];
+    previousRow[0] = firstIndex;
+
+    for (let secondIndex = 1; secondIndex <= second.length; secondIndex += 1) {
+      const current = previousRow[secondIndex];
+      previousRow[secondIndex] = Math.min(
+        previousRow[secondIndex] + 1,
+        previousRow[secondIndex - 1] + 1,
+        previousDiagonal + (first[firstIndex - 1] === second[secondIndex - 1] ? 0 : 1)
+      );
+      previousDiagonal = current;
+    }
+  }
+
+  return previousRow[second.length];
+}
+
+function isFuzzyTagMatch(tag, searchTerm) {
+  if (tag.includes(searchTerm) || searchTerm.includes(tag)) return true;
+
+  const maximumDistance = Math.max(1, Math.floor(Math.max(tag.length, searchTerm.length) * 0.2));
+  return levenshteinDistance(tag, searchTerm) <= maximumDistance;
+}
+
+function matchesQuickPick(tags = [], vibe) {
+  const normalizedVibe = normalizeTag(vibe);
+  const searchTerms = (QUICK_PICK_TAG_GROUPS[normalizedVibe] || [normalizedVibe]).map(normalizeTag);
+
+  return tags.some(tag => {
+    const normalizedTag = normalizeTag(tag);
+    return searchTerms.some(searchTerm => isFuzzyTagMatch(normalizedTag, searchTerm));
+  });
+}
+
+async function getSteamArtwork(appId, fallbackHeaderImage) {
+  try {
+    const response = await axios.get(`${STEAM_STORE_API_BASE}/appdetails`, {
+      params: { appids: appId, l: 'english' },
+      timeout: 5000
+    });
+    const appDetails = response.data[String(appId)];
+    const gameData = appDetails?.success ? appDetails.data : null;
+
+    return {
+      headerImage: gameData?.header_image || fallbackHeaderImage,
+      backgroundImage: gameData?.background || gameData?.screenshots?.[0]?.path_full || fallbackHeaderImage
+    };
+  } catch (error) {
+    console.warn(`[PlayMatch] Could not load Steam artwork for app ${appId}: ${error.message}`);
+    return { headerImage: fallbackHeaderImage, backgroundImage: fallbackHeaderImage };
+  }
+}
+
+async function addSteamArtwork(recommendations, userLibrary) {
+  const playtimeByAppId = new Map(
+    userLibrary.map(game => [String(game.appid), getPlaytimeMetrics(game)])
+  );
+
+  return Promise.all(recommendations.map(async recommendation => {
+    const image = `https://steamcdn-a.akamaihd.net/steam/apps/${recommendation.appid}/header.jpg`;
+    const artwork = await getSteamArtwork(recommendation.appid, image);
+    return {
+      ...recommendation,
+      image: artwork.headerImage,
+      ...playtimeByAppId.get(String(recommendation.appid)),
+      ...artwork
+    };
+  }));
+}
+
 function getErrorStatus(error) {
   return Number(error?.status || error?.response?.status || error?.code);
 }
@@ -189,21 +289,26 @@ function isRetryableGeminiError(error) {
   return status === 429 || status === 503;
 }
 
-async function generateContentWithFallback(prompt) {
-  try {
-    return await withExponentialBackoff(() => primaryModel.generateContent(prompt));
-  } catch (error) {
-    if (!isRetryableGeminiError(error)) {
-      throw error;
+async function generateGeminiContent(prompt) {
+  let lastError;
+
+  for (let retry = 0; retry <= 3; retry += 1) {
+    try {
+      return await model.generateContent(prompt);
+    } catch (error) {
+      lastError = error;
+
+      if (!isRetryableGeminiError(error) || retry === 3) {
+        break;
+      }
+
+      const delayMs = 1000 * 2 ** retry;
+      console.warn(`[PlayMatch] ${GEMINI_MODEL} request failed; retrying in ${delayMs}ms.`);
+      await new Promise(resolve => setTimeout(resolve, delayMs));
     }
-
-    console.warn(
-      `[PlayMatch] ${PRIMARY_MODEL} remained unavailable after retries. Falling back to ${FALLBACK_MODEL}.`
-    );
-
-    const fallbackModel = genAI.getGenerativeModel({ model: FALLBACK_MODEL });
-    return withExponentialBackoff(() => fallbackModel.generateContent(prompt));
   }
+
+  throw lastError;
 }
 
 // --- ROUTE 1: RECOMMENDATIONS (AI SEARCH) ---
@@ -267,7 +372,7 @@ router.get('/recommendations/:identifier', aiSearchLimiter, async (req, res) => 
       return {
         appid: game.appid,
         name: game.name,
-        playtime_hours: Math.round(game.playtime_forever / 60),
+        ...getPlaytimeMetrics(game),
         tags: finalTags
       };
     });
@@ -321,7 +426,7 @@ router.get('/recommendations/:identifier', aiSearchLimiter, async (req, res) => 
       `;
 
       try {
-        const result = await generateContentWithFallback(aiPrompt);
+        const result = await generateGeminiContent(aiPrompt);
         const cleanJson = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
 
         if (!cleanJson.startsWith('{')) throw new Error("AI returned invalid JSON");
@@ -338,6 +443,11 @@ router.get('/recommendations/:identifier', aiSearchLimiter, async (req, res) => 
 
       } catch (aiError) {
         console.log(`[PlayMatch] AI/Validation Error: ${aiError.message}`);
+        if (isRetryableGeminiError(aiError)) {
+          return res.status(503).json({
+            error: 'Recommendations are temporarily unavailable. Please try again shortly.'
+          });
+        }
         // --- UPDATE: Slice 12 instead of 9 for fallback ---
         const randomBackup = shuffleArray(enrichedGames).slice(0, 12);
         finalRecommendations = randomBackup.map(g => ({
@@ -348,10 +458,7 @@ router.get('/recommendations/:identifier', aiSearchLimiter, async (req, res) => 
       }
     }
 
-    const resultWithImages = finalRecommendations.map(rec => ({
-      ...rec,
-      image: rec.image || `https://steamcdn-a.akamaihd.net/steam/apps/${rec.appid}/header.jpg`
-    }));
+    const resultWithImages = await addSteamArtwork(finalRecommendations, enrichedGames);
 
     res.json({ recommendations: resultWithImages });
 
@@ -407,8 +514,9 @@ router.get('/user-games/:identifier', async (req, res) => {
       return {
         appid: game.appid,
         name: game.name,
-        playtime_hours: Math.round(game.playtime_forever / 60),
-        tags: finalTags
+        ...getPlaytimeMetrics(game),
+        tags: finalTags,
+        image: `https://steamcdn-a.akamaihd.net/steam/apps/${game.appid}/header.jpg`
       };
     }).filter(g => !isExplicitContent(g.name, g.tags));
 
@@ -420,7 +528,72 @@ router.get('/user-games/:identifier', async (req, res) => {
   }
 });
 
-// --- ROUTE 3: ROULETTE / SURPRISE ME ---
+// --- ROUTE 3: SMART QUICK PICKS (NO AI) ---
+router.get('/quick-picks/:identifier', async (req, res) => {
+  try {
+    const { identifier } = req.params;
+    const { vibe } = req.query;
+    let steamId64;
+
+    if (!vibe) return res.status(400).json({ error: 'Quick Pick is required.' });
+
+    if (/^7656\d{13}$/.test(identifier)) {
+      steamId64 = identifier;
+    } else {
+      const resolveUrl = `${STEAM_API_BASE}/ISteamUser/ResolveVanityURL/v0001/`;
+      const resolveResponse = await axios.get(resolveUrl, {
+        params: { key: STEAM_API_KEY, vanityurl: identifier }
+      });
+
+      if (resolveResponse.data.response?.success !== 1) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      steamId64 = resolveResponse.data.response.steamid;
+    }
+
+    const ownedGamesUrl = `${STEAM_API_BASE}/IPlayerService/GetOwnedGames/v0001/`;
+    const steamResponse = await axios.get(ownedGamesUrl, {
+      params: {
+        key: STEAM_API_KEY,
+        steamid: steamId64,
+        format: 'json',
+        include_appinfo: 1,
+        include_played_free_games: 1
+      }
+    });
+
+    if (!steamResponse.data.response?.games) {
+      return res.status(404).json({ error: 'Library is private or empty.' });
+    }
+
+    const userGames = steamResponse.data.response.games;
+    const appIds = userGames.map(game => String(game.appid));
+    const gamesFromDb = await SteamGame.find({ appid: { $in: appIds } }).lean();
+    const tagsByAppId = new Map(gamesFromDb.map(game => [game.appid, game.tags]));
+
+    const matches = userGames.map(game => {
+      const appId = String(game.appid);
+      const tags = POPULAR_GAMES_FIX[appId] || tagsByAppId.get(appId) || [];
+
+      return {
+        appid: game.appid,
+        name: game.name,
+        ...getPlaytimeMetrics(game),
+        tags,
+        image: `https://steamcdn-a.akamaihd.net/steam/apps/${game.appid}/header.jpg`,
+        reason: `Matches your ${vibe} Quick Pick.`
+      };
+    }).filter(game => !isExplicitContent(game.name, game.tags) && matchesQuickPick(game.tags, vibe));
+
+    res.json({ recommendations: shuffleArray(matches).slice(0, 12) });
+  } catch (error) {
+    console.error(`[Quick Picks Error]`, error.message);
+    res.status(500).json({ error: 'Unable to filter your Steam library.' });
+  }
+});
+
+// --- ROUTE 4: ROULETTE / SURPRISE ME ---
 router.get('/roulette/:identifier', async (req, res) => {
   try {
     const { identifier } = req.params;
@@ -465,7 +638,7 @@ router.get('/roulette/:identifier', async (req, res) => {
       return {
         appid: game.appid,
         name: game.name,
-        playtime_hours: Math.round(game.playtime_forever / 60),
+        ...getPlaytimeMetrics(game),
         tags: finalTags
       };
     }).filter(g => !isExplicitContent(g.name, g.tags));
@@ -486,6 +659,7 @@ router.get('/roulette/:identifier', async (req, res) => {
       name: winner.name,
       reason: "The Fates have decided! Time to play this.",
       image: `https://steamcdn-a.akamaihd.net/steam/apps/${winner.appid}/header.jpg`,
+      ...getPlaytimeMetrics(winner),
       fillers: fillers.map(g => ({ name: g.name }))
     };
 

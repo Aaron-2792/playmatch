@@ -264,52 +264,8 @@ button:disabled {
   align-items: start;
 }
 
-.game-card {
-  background: var(--card-bg);
-  border-radius: 12px;
-  overflow: hidden;
-  text-align: left;
-  border: 1px solid #383838;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  width: 100%;
-  margin: 0;
-}
-
-.game-card:hover {
-  transform: translateY(-8px);
-  border-color: var(--accent);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.5);
-}
-
-.card-image {
-  width: 100%;
-  height: 150px;
-  background-size: cover;
-  background-position: center;
-  border-bottom: 1px solid #383838;
-}
-
-.card-content {
-  padding: 1.2rem;
-  display: flex;
-  flex-direction: column;
-  flex-grow: 1;
-}
-
-.game-title {
-  font-size: 1.2rem;
-  margin: 0 0 0.5rem 0;
-  color: var(--text-main);
-  font-weight: 700;
-}
-
-.ai-reason {
-  color: var(--text-secondary);
-  line-height: 1.5;
-  font-size: 0.9rem;
+.results-grid--loading {
+  filter: saturate(0.75);
 }
 
 .error-msg {
@@ -461,4 +417,9 @@ button:disabled {
     display: none;
     /* Hide sidebars on smaller screens */
   }
+}
+
+.winner-card .playtime-metrics {
+  justify-content: center;
+  margin: 0 0 1.5rem;
 }

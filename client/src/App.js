@@ -1,15 +1,26 @@
 import React, { useState } from 'react';
 import './App.css';
+import GameCard from './components/GameCard';
+import GamingLoader from './components/GamingLoader';
+import PlaytimeMetrics from './components/PlaytimeMetrics';
 import RouletteWheel from './components/RouletteWheel';
 import SteamStats from './components/SteamStats';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
+const normalizeSteamId = value => {
+  const trimmedValue = value.trim();
+  if (!trimmedValue.includes('/')) return trimmedValue;
+
+  const parts = trimmedValue.split('/').filter(part => part.length > 0);
+  return parts[parts.length - 1];
+};
+
 function App() {
   const [steamId, setSteamId] = useState('');
   const [mood, setMood] = useState('');
   const [recommendations, setRecommendations] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
   // Sidebars State
@@ -37,8 +48,8 @@ function App() {
     }
   };
 
-  const handleSearch = async (overrideMood = null) => {
-    const searchMood = overrideMood || mood; // Allow clicking chips to search
+  const handleSearch = async () => {
+    const searchMood = mood;
 
     // Exclusive Mode Cleanup
     setRouletteResult(null);
@@ -51,16 +62,12 @@ function App() {
       return;
     }
 
-    setLoading(true);
+    setIsLoading(true);
     setError(null);
     setRecommendations([]);
 
     try {
-      let cleanId = steamId.trim();
-      if (cleanId.includes('/')) {
-        const parts = cleanId.split('/').filter(p => p.length > 0);
-        cleanId = parts[parts.length - 1];
-      }
+      const cleanId = normalizeSteamId(steamId);
 
       // Load sidebar data if not already loaded
       if (recentGames.length === 0) loadSidebarData(cleanId);
@@ -77,13 +84,45 @@ function App() {
     } catch (err) {
       setError(err.message);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  const handleQuickSearch = (vibe) => {
-    setMood(vibe);
-    handleSearch(vibe);
+  const handleQuickSearch = async (vibe) => {
+    if (!steamId) {
+      setError('Please enter your Steam ID first.');
+      return;
+    }
+
+    setError(null);
+    setRecommendations([]);
+    setRouletteResult(null);
+    setTargetGame(null);
+    setWheelGames([]);
+    setIsSpinning(false);
+    setIsLoading(true);
+
+    try {
+      const cleanId = normalizeSteamId(steamId);
+      const response = await fetch(
+        `${API_BASE}/api/quick-picks/${cleanId}?vibe=${encodeURIComponent(vibe)}`
+      );
+      const data = await response.json();
+
+      if (!response.ok) throw new Error(data.error || 'Unable to filter your Steam library.');
+
+      setRecommendations(data.recommendations);
+
+      if (data.recommendations.length === 0) {
+        setError(`No ${vibe} games were found in your tagged Steam library.`);
+      }
+
+      if (recentGames.length === 0) loadSidebarData(cleanId);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleRoulette = async () => {
@@ -101,11 +140,7 @@ function App() {
     setSpinKey(prev => prev + 1);
 
     try {
-      let cleanId = steamId.trim();
-      if (cleanId.includes('/')) {
-        const parts = cleanId.split('/').filter(p => p.length > 0);
-        cleanId = parts[parts.length - 1];
-      }
+      const cleanId = normalizeSteamId(steamId);
 
       // Load sidebar data if not already loaded
       if (recentGames.length === 0) loadSidebarData(cleanId);
@@ -139,15 +174,11 @@ function App() {
     }
     setRouletteResult(null);
     setIsSpinning(false);
-    setLoading(true);
+    setIsLoading(true);
     setError(null);
 
     try {
-      let cleanId = steamId.trim();
-      if (cleanId.includes('/')) {
-        const parts = cleanId.split('/').filter(p => p.length > 0);
-        cleanId = parts[parts.length - 1];
-      }
+      const cleanId = normalizeSteamId(steamId);
 
       const res = await fetch(`${API_BASE}/api/stats/${cleanId}`);
       const data = await res.json();
@@ -162,7 +193,7 @@ function App() {
     } catch (err) {
       setError(err.message);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -204,6 +235,7 @@ function App() {
               placeholder="Steam ID or Profile URL"
               value={steamId}
               onChange={(e) => setSteamId(e.target.value)}
+              disabled={isLoading}
             />
             <input
               type="text"
@@ -211,17 +243,18 @@ function App() {
               placeholder="What's your vibe? (e.g. Shooter, Chill)"
               value={mood}
               onChange={(e) => setMood(e.target.value)}
+              disabled={isLoading}
               onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
             />
 
             <div className="button-group">
-              <button className="btn primary-btn" onClick={() => handleSearch()} disabled={loading || isSpinning}>
-                {loading ? 'Analyzing...' : 'Find Games'}
+              <button className="btn primary-btn" onClick={handleSearch} disabled={isLoading || isSpinning}>
+                {isLoading ? 'Analyzing...' : 'Find Games'}
               </button>
-              <button className="btn roulette-btn" onClick={handleRoulette} disabled={loading || isSpinning}>
+              <button className="btn roulette-btn" onClick={handleRoulette} disabled={isLoading || isSpinning}>
                 {isSpinning ? '🎲 Surprise Me' : '🎲 Surprise Me'}
               </button>
-              <button className="btn stats-btn" onClick={handleStats} disabled={loading || isSpinning}>
+              <button className="btn stats-btn" onClick={handleStats} disabled={isLoading || isSpinning}>
                 🎮 Profile DNA
               </button>
             </div>
@@ -248,6 +281,7 @@ function App() {
                 <img src={rouletteResult.image} alt={rouletteResult.name} />
                 <h3>{rouletteResult.name}</h3>
                 <p>{rouletteResult.reason}</p>
+                <PlaytimeMetrics game={rouletteResult} />
                 <div className="winner-actions">
                   <button className="btn close-btn" onClick={() => setRouletteResult(null)}>Close</button>
                   <button className="btn roulette-btn" onClick={handleRoulette}>Spin Again</button>
@@ -258,19 +292,9 @@ function App() {
 
           {showStats && <SteamStats stats={stats} onClose={() => setShowStats(false)} />}
 
-          <div className="results-grid">
-            {recommendations.map((game) => (
-              <div key={game.appid} className="game-card">
-                <div
-                  className="card-image"
-                  style={{ backgroundImage: `url(${game.image})` }}
-                ></div>
-                <div className="card-content">
-                  <div className="game-title">{game.name}</div>
-                  <div className="game-reason">{game.reason}</div>
-                </div>
-              </div>
-            ))}
+          <div className={`results-grid ${isLoading ? 'results-grid--loading' : ''}`}>
+            {isLoading && <GamingLoader />}
+            {!isLoading && recommendations.map(game => <GameCard key={game.appid} game={game} />)}
           </div>
         </main>
 
@@ -298,7 +322,7 @@ function App() {
               'Open World', 'Sandbox', 'Crafting', 'Turn-Based', 'Hack & Slash',
               'Looter Shooter', 'Stealth', 'Co-op', 'PvP', 'VR', 'Pixel Art'
             ].map(vibe => (
-              <button key={vibe} className="vibe-chip" onClick={() => handleQuickSearch(vibe)}>
+              <button key={vibe} className="vibe-chip" onClick={() => handleQuickSearch(vibe)} disabled={isLoading || isSpinning}>
                 {vibe}
               </button>
             ))}
