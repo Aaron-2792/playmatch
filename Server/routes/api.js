@@ -1,15 +1,27 @@
 const express = require('express');
 const axios = require('axios');
+const rateLimit = require('express-rate-limit');
 const mongoose = require('mongoose');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { withExponentialBackoff } = require('../utils/exponentialBackoff');
 const router = express.Router();
 
 const STEAM_API_KEY = process.env.STEAM_API_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const STEAM_API_BASE = 'http://api.steampowered.com';
+const PRIMARY_MODEL = 'gemini-3.7-flash';
+const FALLBACK_MODEL = 'gemini-3.5-flash';
 
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
+const primaryModel = genAI.getGenerativeModel({ model: PRIMARY_MODEL });
+
+const aiSearchLimiter = rateLimit({
+  windowMs: 900000,
+  max: 50,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many AI search requests. Please try again in 15 minutes.' }
+});
 
 // --- 1. MONGO SCHEMA ---
 const GameSchema = new mongoose.Schema({
@@ -168,8 +180,34 @@ function validateAIRecommendations(aiRecommendations, userLibrary) {
   });
 }
 
+function getErrorStatus(error) {
+  return Number(error?.status || error?.response?.status || error?.code);
+}
+
+function isRetryableGeminiError(error) {
+  const status = getErrorStatus(error);
+  return status === 429 || status === 503;
+}
+
+async function generateContentWithFallback(prompt) {
+  try {
+    return await withExponentialBackoff(() => primaryModel.generateContent(prompt));
+  } catch (error) {
+    if (!isRetryableGeminiError(error)) {
+      throw error;
+    }
+
+    console.warn(
+      `[PlayMatch] ${PRIMARY_MODEL} remained unavailable after retries. Falling back to ${FALLBACK_MODEL}.`
+    );
+
+    const fallbackModel = genAI.getGenerativeModel({ model: FALLBACK_MODEL });
+    return withExponentialBackoff(() => fallbackModel.generateContent(prompt));
+  }
+}
+
 // --- ROUTE 1: RECOMMENDATIONS (AI SEARCH) ---
-router.get('/recommendations/:identifier', async (req, res) => {
+router.get('/recommendations/:identifier', aiSearchLimiter, async (req, res) => {
   try {
     const { identifier } = req.params;
     const { mood } = req.query;
@@ -283,7 +321,7 @@ router.get('/recommendations/:identifier', async (req, res) => {
       `;
 
       try {
-        const result = await model.generateContent(aiPrompt);
+        const result = await generateContentWithFallback(aiPrompt);
         const cleanJson = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
 
         if (!cleanJson.startsWith('{')) throw new Error("AI returned invalid JSON");

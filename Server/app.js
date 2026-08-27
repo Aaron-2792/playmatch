@@ -2,13 +2,15 @@
 
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 
 // Initialize the express app
 const app = express();
 
 // --- Core Middleware ---
-app.use(cors()); 
-app.use(express.json()); 
+app.use(helmet());
+app.use(cors());
+app.use(express.json());
 
 // --- Routes ---
 const apiRoutes = require('./routes/api');
