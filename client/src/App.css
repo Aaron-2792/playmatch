@@ -59,17 +59,18 @@ h1 {
 
 /* --- SEARCH SECTION --- */
 .search-card {
+  align-items: center;
   background: var(--card-bg);
+  box-sizing: border-box;
   padding: 2.5rem;
   border-radius: 16px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   margin-bottom: 3rem;
   display: flex;
   flex-wrap: wrap;
-  gap: 1.5rem;
+  gap: 1rem;
   margin-left: auto;
   margin-right: auto;
-  align-items: center;
   justify-content: center;
 }
 
@@ -89,6 +90,92 @@ input[type='text'] {
 input[type='text']:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.25);
+}
+
+.mood-search-group {
+  align-items: center;
+  display: flex;
+  flex: 1 1 420px;
+  flex-wrap: wrap;
+  gap: 1rem;
+  min-width: min(100%, 420px);
+}
+
+.mood-search-group input[type='text'] {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.toggle-wrapper {
+  align-items: center;
+  color: var(--text-secondary);
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 0.9rem;
+  font-weight: 700;
+  gap: 0.5rem;
+}
+
+.toggle-control {
+  align-items: center;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 0.5rem;
+}
+
+.toggle-wrapper input {
+  height: 1px;
+  opacity: 0;
+  position: absolute;
+  width: 1px;
+}
+
+.unplayed-toggle__label {
+  white-space: nowrap;
+}
+
+.unplayed-toggle__track {
+  align-items: center;
+  background: #353535;
+  border: 1px solid #555;
+  border-radius: 999px;
+  display: inline-flex;
+  height: 1.5rem;
+  padding: 0.15rem;
+  transition: background 180ms ease, border-color 180ms ease;
+  width: 2.7rem;
+}
+
+.unplayed-toggle__thumb {
+  background: #b3b3b3;
+  border-radius: 50%;
+  height: 1.2rem;
+  transform: translateX(0);
+  transition: background 180ms ease, transform 180ms ease;
+  width: 1.2rem;
+}
+
+.toggle-wrapper input:checked + .unplayed-toggle__track {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.toggle-wrapper input:checked + .unplayed-toggle__track .unplayed-toggle__thumb {
+  background: #111;
+  transform: translateX(1.2rem);
+}
+
+.toggle-wrapper input:focus-visible + .unplayed-toggle__track {
+  box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.25);
+}
+
+.button-group {
+  align-items: center;
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: center;
 }
 
 /* --- BUTTONS --- */
@@ -164,8 +251,9 @@ button:disabled {
 .sidebar h3 {
   margin-top: 0;
   color: var(--accent);
-  font-size: 1.5rem;
+  font-size: 1.9rem;
   font-weight: 800;
+  letter-spacing: 0.02em;
   border-bottom: 1px solid #444;
   padding-bottom: 10px;
   margin-bottom: 15px;
@@ -179,10 +267,14 @@ button:disabled {
 }
 
 /* Recent Games List */
+.left-sidebar {
+  padding: 2rem;
+}
+
 .recent-list {
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 1.25rem;
 }
 
 .recent-card {
@@ -190,7 +282,7 @@ button:disabled {
   align-items: center;
   gap: 10px;
   background: #252525;
-  padding: 8px;
+  padding: 12px;
   border-radius: 8px;
   transition: transform 0.2s;
 }
@@ -201,8 +293,8 @@ button:disabled {
 }
 
 .recent-card img {
-  width: 50px;
-  height: 25px;
+  width: 64px;
+  height: 36px;
   object-fit: cover;
   border-radius: 4px;
 }
@@ -232,20 +324,27 @@ button:disabled {
 .vibes-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  justify-content: center;
-  /* Centers the chips */
+  gap: 0.6rem;
 }
 
 .vibe-chip {
+  align-items: center;
   background: #2a2a2a;
   border: 1px solid #444;
+  box-sizing: border-box;
   color: #ccc;
-  padding: 6px 12px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: auto;
+  justify-content: center;
+  min-width: fit-content;
+  padding: 0.6rem 1.2rem;
   border-radius: 20px;
-  font-size: 0.8rem;
+  font-size: 1rem;
   cursor: pointer;
   transition: all 0.2s;
+  white-space: nowrap;
+  width: auto;
 }
 
 .vibe-chip:hover {
@@ -267,6 +366,23 @@ button:disabled {
 
 .results-grid--loading {
   filter: saturate(0.75);
+}
+
+.empty-results {
+  align-items: center;
+  background: rgba(30, 30, 30, 0.7);
+  border: 1px solid #3d3d3d;
+  border-radius: 12px;
+  color: var(--text-secondary);
+  display: flex;
+  grid-column: 1 / -1;
+  justify-content: center;
+  line-height: 1.6;
+  margin: 1rem auto;
+  max-width: 680px;
+  min-height: 130px;
+  padding: 1.5rem 2rem;
+  text-align: center;
 }
 
 .hall-of-fame {

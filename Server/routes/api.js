@@ -101,9 +101,26 @@ const TAG_SYNONYMS = {
 
 const QUICK_PICK_TAG_GROUPS = {
   ...TAG_SYNONYMS,
+  action: ['action', 'action-adventure', 'hack and slash', 'beat em up', 'brawler'],
+  rpg: ['rpg', 'role-playing', 'jrpg', 'crpg', 'action rpg', 'adventure'],
   strategy: ['strategy', 'real-time strategy', 'turn-based strategy', '4x', 'tactical'],
-  'co-op': ['co-op', 'online co-op', 'local co-op', 'multiplayer', 'split screen', 'team-based'],
-  'sci-fi': ['sci-fi', 'science fiction', 'space', 'futuristic', 'aliens', 'robots']
+  'co op': ['co-op', 'online co-op', 'local co-op', 'multiplayer', 'split screen', 'team-based'],
+  'sci fi': ['sci-fi', 'science fiction', 'space', 'futuristic', 'aliens', 'robots'],
+  horror: ['horror', 'survival horror', 'psychological horror', 'jump scare', 'zombies', 'scary'],
+  cozy: ['cozy', 'relaxing', 'casual', 'wholesome', 'farming sim', 'life sim', 'chill', 'cute'],
+  simulation: ['simulation', 'sim', 'immersive sim', 'farming sim', 'life sim', 'sandbox'],
+  fps: ['fps', 'shooter', 'first-person shooter', 'first-person', 'hero shooter'],
+  'open world': ['open world', 'exploration', 'sandbox', 'adventure'],
+  survival: ['survival', 'survival horror', 'crafting', 'open world survival craft'],
+  indie: ['indie', 'independent', 'pixel art', 'retro'],
+  roguelike: ['roguelike', 'rogue-lite', 'rogue', 'dungeon crawler', 'permadeath'],
+  platformer: ['platformer', 'precision platformer', '3d platformer', '2d platformer', 'side scroller'],
+  puzzle: ['puzzle', 'logic', 'hidden object', 'physics', 'mystery', 'investigation'],
+  'story rich': ['story rich', 'narrative', 'lore-rich', 'interactive fiction', 'choices matter'],
+  casual: ['casual', 'family friendly', 'arcade', 'minigames', 'simple'],
+  cyberpunk: ['cyberpunk', 'sci-fi', 'futuristic', 'hacker', 'dystopian', 'high tech'],
+  'card board': ['card game', 'deckbuilding', 'board game', 'tabletop', 'strategy'],
+  'sports racing': ['sports', 'racing', 'driving', 'automobile', 'sim racing', 'football', 'soccer']
 };
 
 const RESTRICTED_KEYWORDS = ["nudity", "sexual", "hentai", "nsfw", "adult only", "ecchi", "erotic", "18+"];
@@ -315,7 +332,7 @@ async function generateGeminiContent(prompt) {
 router.get('/recommendations/:identifier', aiSearchLimiter, async (req, res) => {
   try {
     const { identifier } = req.params;
-    const { mood } = req.query;
+    const { mood, showUnplayedOnly } = req.query;
     let steamId64;
 
     if (!mood) return res.status(400).json({ error: 'Prompt is required.' });
@@ -354,7 +371,9 @@ router.get('/recommendations/:identifier', aiSearchLimiter, async (req, res) => 
       return res.status(404).json({ error: 'Library is private or empty.' });
     }
 
-    const userGames = steamResponse.data.response.games;
+    const userGames = steamResponse.data.response.games.filter(game => (
+      showUnplayedOnly !== 'true' || !game.playtime_forever
+    ));
     const initialCount = userGames.length;
     console.log(`\n[DEBUG] Steam returned ${initialCount} total items.`);
 
@@ -532,7 +551,7 @@ router.get('/user-games/:identifier', async (req, res) => {
 router.get('/quick-picks/:identifier', async (req, res) => {
   try {
     const { identifier } = req.params;
-    const { vibe } = req.query;
+    const { vibe, showUnplayedOnly } = req.query;
     let steamId64;
 
     if (!vibe) return res.status(400).json({ error: 'Quick Pick is required.' });
@@ -567,7 +586,9 @@ router.get('/quick-picks/:identifier', async (req, res) => {
       return res.status(404).json({ error: 'Library is private or empty.' });
     }
 
-    const userGames = steamResponse.data.response.games;
+    const userGames = steamResponse.data.response.games.filter(game => (
+      showUnplayedOnly !== 'true' || !game.playtime_forever
+    ));
     const appIds = userGames.map(game => String(game.appid));
     const gamesFromDb = await SteamGame.find({ appid: { $in: appIds } }).lean();
     const tagsByAppId = new Map(gamesFromDb.map(game => [game.appid, game.tags]));

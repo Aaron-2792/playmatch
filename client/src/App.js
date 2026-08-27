@@ -19,7 +19,9 @@ const normalizeSteamId = value => {
 function App() {
   const [steamId, setSteamId] = useState('');
   const [mood, setMood] = useState('');
+  const [showUnplayedOnly, setShowUnplayedOnly] = useState(false);
   const [recommendations, setRecommendations] = useState([]);
+  const [hasSearched, setHasSearched] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -72,6 +74,7 @@ function App() {
     setIsLoading(true);
     setError(null);
     setRecommendations([]);
+    setHasSearched(true);
 
     try {
       const cleanId = normalizeSteamId(steamId);
@@ -80,7 +83,7 @@ function App() {
       if (recentGames.length === 0) loadSidebarData(cleanId);
 
       const response = await fetch(
-        `${API_BASE}/api/recommendations/${cleanId}?mood=${encodeURIComponent(searchMood)}`
+        `${API_BASE}/api/recommendations/${cleanId}?mood=${encodeURIComponent(searchMood)}&showUnplayedOnly=${showUnplayedOnly}`
       );
 
       const data = await response.json();
@@ -103,6 +106,7 @@ function App() {
 
     setError(null);
     setRecommendations([]);
+    setHasSearched(true);
     setRouletteResult(null);
     setTargetGame(null);
     setWheelGames([]);
@@ -112,7 +116,7 @@ function App() {
     try {
       const cleanId = normalizeSteamId(steamId);
       const response = await fetch(
-        `${API_BASE}/api/quick-picks/${cleanId}?vibe=${encodeURIComponent(vibe)}`
+        `${API_BASE}/api/quick-picks/${cleanId}?vibe=${encodeURIComponent(vibe)}&showUnplayedOnly=${showUnplayedOnly}`
       );
       const data = await response.json();
 
@@ -120,7 +124,7 @@ function App() {
 
       setRecommendations(data.recommendations);
 
-      if (data.recommendations.length === 0) {
+      if (data.recommendations.length === 0 && !showUnplayedOnly) {
         setError(`No ${vibe} games were found in your tagged Steam library.`);
       }
 
@@ -244,15 +248,31 @@ function App() {
               onChange={(e) => setSteamId(e.target.value)}
               disabled={isLoading}
             />
-            <input
-              type="text"
-              className="input-field"
-              placeholder="What's your vibe? (e.g. Shooter, Chill)"
-              value={mood}
-              onChange={(e) => setMood(e.target.value)}
-              disabled={isLoading}
-              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-            />
+            <div className="mood-search-group">
+              <input
+                type="text"
+                className="input-field"
+                placeholder="What's your vibe? (e.g. Shooter, Chill)"
+                value={mood}
+                onChange={(e) => setMood(e.target.value)}
+                disabled={isLoading}
+                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+              />
+              <div className="toggle-wrapper">
+                <label className="toggle-control">
+                  <input
+                    type="checkbox"
+                    checked={showUnplayedOnly}
+                    onChange={(e) => setShowUnplayedOnly(e.target.checked)}
+                    disabled={isLoading}
+                  />
+                  <span className="unplayed-toggle__track" aria-hidden="true">
+                    <span className="unplayed-toggle__thumb" />
+                  </span>
+                  <span className="unplayed-toggle__label">Show Unplayed Only</span>
+                </label>
+              </div>
+            </div>
 
             <div className="button-group">
               <button className="btn primary-btn" onClick={handleSearch} disabled={isLoading || isSpinning}>
@@ -301,6 +321,11 @@ function App() {
 
           <div className={`results-grid ${isLoading ? 'results-grid--loading' : ''}`}>
             {isLoading && <GamingLoader />}
+            {!isLoading && hasSearched && showUnplayedOnly && !error && recommendations.length === 0 && (
+              <div className="empty-results" role="status">
+                You've conquered this backlog! No unplayed games found here. Try turning off the Unplayed filter to see your favorites.
+              </div>
+            )}
             {!isLoading && recommendations.map(game => <GameCard key={game.appid} game={game} />)}
           </div>
 
@@ -324,7 +349,7 @@ function App() {
         <aside className="sidebar right-sidebar">
           <h3>Quick Picks</h3>
           <div className="vibes-grid">
-            {['Action', 'RPG', 'Strategy', 'Co-Op', 'Sci-Fi', 'Horror', 'Cozy', 'Simulation'].map(vibe => (
+            {['Action', 'RPG', 'Strategy', 'Co-Op', 'Sci-Fi', 'Horror', 'Cozy', 'Simulation', 'FPS', 'Open World', 'Survival', 'Indie', 'Roguelike', 'Platformer', 'Puzzle', 'Story Rich', 'Casual', 'Cyberpunk', 'Card & Board', 'Sports & Racing'].map(vibe => (
               <button key={vibe} className="vibe-chip" onClick={() => handleQuickSearch(vibe)} disabled={isLoading || isSpinning}>
                 {vibe}
               </button>
