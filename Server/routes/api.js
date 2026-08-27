@@ -9,7 +9,7 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const STEAM_API_BASE = 'http://api.steampowered.com';
 
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-3.7-flash" });
+const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
 
 // --- 1. MONGO SCHEMA ---
 const GameSchema = new mongoose.Schema({
