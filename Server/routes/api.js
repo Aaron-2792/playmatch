@@ -169,6 +169,25 @@ function getFlavorText(mood) {
   const template = REASON_TEMPLATES[Math.floor(Math.random() * REASON_TEMPLATES.length)];
   return template.replace("{mood}", mood);
 }
+// --- STEAM ID VALIDATION ---
+function validateSteamId(identifier) {
+  if (!identifier || typeof identifier !== 'string') {
+    return { valid: false, error: 'Invalid Steam ID format.' };
+  }
+  
+  // Check if it's a SteamID64 (should be exactly 17 digits starting with 7656)
+  if (/^7656\d{13}$/.test(identifier)) {
+    return { valid: true, steamId64: identifier };
+  }
+  
+  // If not a direct SteamID64, it should be treated as a vanity URL
+  // Vanity URLs are alphanumeric and can contain underscores
+  if (/^[a-zA-Z0-9_-]{2,32}$/.test(identifier)) {
+    return { valid: true, isVanity: true, vanityUrl: identifier };
+  }
+  
+  return { valid: false, error: 'Invalid Steam ID. Please enter a valid 17-digit SteamID64 or Steam vanity URL.' };
+}
 
 // --- 5. SAFETY & HALLUCINATION CHECK ---
 function isExplicitContent(title, tags = []) {
@@ -289,7 +308,7 @@ async function addSteamArtwork(recommendations, userLibrary) {
   );
 
   return Promise.all(recommendations.map(async recommendation => {
-    const image = `https://steamcdn-a.akamaihd.net/steam/apps/${recommendation.appid}/header.jpg`;
+    const image = `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${recommendation.appid}/header.jpg`;
     const artwork = await getSteamArtwork(recommendation.appid, image);
     return {
       ...recommendation,
@@ -348,13 +367,18 @@ router.get('/recommendations/:identifier', aiSearchLimiter, async (req, res) => 
       });
     }
 
-    // --- Resolve ID ---
-    if (/^7656\d{13}$/.test(identifier)) {
-      steamId64 = identifier;
-    } else {
+    // --- Validate & Resolve ID ---
+    const idValidation = validateSteamId(identifier);
+    if (!idValidation.valid) {
+      return res.status(400).json({ error: idValidation.error });
+    }
+
+    if (idValidation.steamId64) {
+      steamId64 = idValidation.steamId64;
+    } else if (idValidation.isVanity) {
       const resolveUrl = `${STEAM_API_BASE}/ISteamUser/ResolveVanityURL/v0001/`;
       try {
-        const resolveResponse = await axios.get(resolveUrl, { params: { key: STEAM_API_KEY, vanityurl: identifier } });
+        const resolveResponse = await axios.get(resolveUrl, { params: { key: STEAM_API_KEY, vanityurl: idValidation.vanityUrl } });
         if (resolveResponse.data.response?.success === 1) {
           steamId64 = resolveResponse.data.response.steamid;
         } else {
@@ -496,12 +520,18 @@ router.get('/user-games/:identifier', async (req, res) => {
     const { identifier } = req.params;
     let steamId64;
 
-    if (/^7656\d{13}$/.test(identifier)) {
-      steamId64 = identifier;
-    } else {
+    // --- Validate & Resolve ID ---
+    const idValidation = validateSteamId(identifier);
+    if (!idValidation.valid) {
+      return res.status(400).json({ error: idValidation.error });
+    }
+
+    if (idValidation.steamId64) {
+      steamId64 = idValidation.steamId64;
+    } else if (idValidation.isVanity) {
       const resolveUrl = `${STEAM_API_BASE}/ISteamUser/ResolveVanityURL/v0001/`;
       try {
-        const resolveResponse = await axios.get(resolveUrl, { params: { key: STEAM_API_KEY, vanityurl: identifier } });
+        const resolveResponse = await axios.get(resolveUrl, { params: { key: STEAM_API_KEY, vanityurl: idValidation.vanityUrl } });
         if (resolveResponse.data.response?.success === 1) {
           steamId64 = resolveResponse.data.response.steamid;
         } else {
@@ -538,7 +568,7 @@ router.get('/user-games/:identifier', async (req, res) => {
         name: game.name,
         ...getPlaytimeMetrics(game),
         tags: finalTags,
-        image: `https://steamcdn-a.akamaihd.net/steam/apps/${game.appid}/header.jpg`
+        image: `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${game.appid}/header.jpg`
       };
     }).filter(g => !isExplicitContent(g.name, g.tags));
 
@@ -559,12 +589,18 @@ router.get('/quick-picks/:identifier', async (req, res) => {
 
     if (!vibe) return res.status(400).json({ error: 'Quick Pick is required.' });
 
-    if (/^7656\d{13}$/.test(identifier)) {
-      steamId64 = identifier;
-    } else {
+    // --- Validate & Resolve ID ---
+    const idValidation = validateSteamId(identifier);
+    if (!idValidation.valid) {
+      return res.status(400).json({ error: idValidation.error });
+    }
+
+    if (idValidation.steamId64) {
+      steamId64 = idValidation.steamId64;
+    } else if (idValidation.isVanity) {
       const resolveUrl = `${STEAM_API_BASE}/ISteamUser/ResolveVanityURL/v0001/`;
       const resolveResponse = await axios.get(resolveUrl, {
-        params: { key: STEAM_API_KEY, vanityurl: identifier }
+        params: { key: STEAM_API_KEY, vanityurl: idValidation.vanityUrl }
       });
 
       if (resolveResponse.data.response?.success !== 1) {
@@ -605,7 +641,7 @@ router.get('/quick-picks/:identifier', async (req, res) => {
         name: game.name,
         ...getPlaytimeMetrics(game),
         tags,
-        image: `https://steamcdn-a.akamaihd.net/steam/apps/${game.appid}/header.jpg`,
+        image: `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${game.appid}/header.jpg`,
         reason: `Matches your ${vibe} Quick Pick.`
       };
     }).filter(game => !isExplicitContent(game.name, game.tags) && matchesQuickPick(game.tags, vibe));
@@ -682,7 +718,7 @@ router.get('/roulette/:identifier', async (req, res) => {
       appid: winner.appid,
       name: winner.name,
       reason: "The Fates have decided! Time to play this.",
-      image: `https://steamcdn-a.akamaihd.net/steam/apps/${winner.appid}/header.jpg`,
+      image: `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${winner.appid}/header.jpg`,
       ...getPlaytimeMetrics(winner),
       fillers: fillers.map(g => ({ name: g.name }))
     };
@@ -701,16 +737,25 @@ router.get('/stats/:identifier', async (req, res) => {
     const { identifier } = req.params;
     let steamId64;
 
-    // 1. Resolve ID
-    if (/^7656\d{13}$/.test(identifier)) {
-      steamId64 = identifier;
-    } else {
+    // 1. Validate & Resolve ID
+    const idValidation = validateSteamId(identifier);
+    if (!idValidation.valid) {
+      return res.status(400).json({ error: idValidation.error });
+    }
+
+    if (idValidation.steamId64) {
+      steamId64 = idValidation.steamId64;
+    } else if (idValidation.isVanity) {
       const resolveUrl = `${STEAM_API_BASE}/ISteamUser/ResolveVanityURL/v0001/`;
-      const resolveResponse = await axios.get(resolveUrl, { params: { key: STEAM_API_KEY, vanityurl: identifier } });
-      if (resolveResponse.data.response?.success === 1) {
-        steamId64 = resolveResponse.data.response.steamid;
-      } else {
-        return res.status(404).json({ error: "User not found" });
+      try {
+        const resolveResponse = await axios.get(resolveUrl, { params: { key: STEAM_API_KEY, vanityurl: idValidation.vanityUrl } });
+        if (resolveResponse.data.response?.success === 1) {
+          steamId64 = resolveResponse.data.response.steamid;
+        } else {
+          return res.status(404).json({ error: "User not found" });
+        }
+      } catch (err) {
+        return res.status(500).json({ error: 'Steam API Error' });
       }
     }
 
@@ -828,7 +873,7 @@ router.get('/recent/:identifier', async (req, res) => {
       appid: g.appid,
       name: g.name,
       playtime_2weeks: Math.round(g.playtime_2weeks / 60), // Convert to hours
-      image: `https://steamcdn-a.akamaihd.net/steam/apps/${g.appid}/header.jpg`
+      image: `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${g.appid}/header.jpg`
     }));
 
     res.json({ games: formattedGames });
