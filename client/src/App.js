@@ -6,9 +6,35 @@ import PlaytimeMetrics from './components/PlaytimeMetrics';
 import RouletteWheel from './components/RouletteWheel';
 import SteamStats from './components/SteamStats';
 
-// For development, use http://localhost:5000/api
-// For production on Vercel, use relative /api path (rewrites configured in vercel.json)
-const API_BASE = process.env.REACT_APP_API_URL || (process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:5000/api');
+// Explicit API URL Configuration
+// Production (Vercel frontend → Render backend): uses REACT_APP_API_URL from .env.production
+// Development (localhost): uses local Express server
+const API_BASE = process.env.REACT_APP_API_URL || (process.env.NODE_ENV === 'production' ? 'https://playmatch-backend.onrender.com' : 'http://localhost:5000');
+
+// Defensive fetch helper: intercepts text response and logs raw content if JSON parsing fails
+const defensiveFetch = async (url, options = {}) => {
+  try {
+    const res = await fetch(url, options);
+    const text = await res.text();
+    
+    // Log request details for debugging
+    console.log(`[API Request] ${options.method || 'GET'} ${url}`);
+    console.log(`[API Response Status] ${res.status}`);
+    
+    try {
+      const data = JSON.parse(text);
+      return { ok: res.ok, status: res.status, data };
+    } catch (parseError) {
+      // If JSON parsing fails, log the raw HTML/text response
+      console.error(`[JSON Parse Error] Failed to parse response from ${url}`);
+      console.error(`[Raw Response Text] ${text.substring(0, 500)}...`); // Log first 500 chars
+      throw new Error(`Server returned invalid JSON. Status: ${res.status}. Check console for raw response.`);
+    }
+  } catch (err) {
+    console.error(`[Fetch Error] ${url}`, err);
+    throw err;
+  }
+};
 
 const normalizeSteamId = value => {
   const trimmedValue = value.trim();
@@ -50,15 +76,13 @@ function App() {
   // --- NEW: Helper to load Sidebar Data ---
   const loadSidebarData = async (id) => {
     try {
-      const [recentResponse, libraryResponse] = await Promise.all([
-        fetch(`${API_BASE}/recent/${id}`),
-        fetch(`${API_BASE}/user-games/${id}`)
+      const [recentRes, libraryRes] = await Promise.all([
+        defensiveFetch(`${API_BASE}/api/recent/${id}`),
+        defensiveFetch(`${API_BASE}/api/user-games/${id}`)
       ]);
-      const recentData = await recentResponse.json();
-      const libraryData = await libraryResponse.json();
-
-      if (recentResponse.ok) setRecentGames(recentData.games);
-      if (libraryResponse.ok) setOwnedGames(libraryData.games);
+      
+      if (recentRes.ok && recentRes.data.games) setRecentGames(recentRes.data.games);
+      if (libraryRes.ok && libraryRes.data.games) setOwnedGames(libraryRes.data.games);
     } catch (err) {
       console.error("Sidebar load failed", err);
     }
@@ -89,15 +113,13 @@ function App() {
       // Load sidebar data if not already loaded
       if (recentGames.length === 0) loadSidebarData(cleanId);
 
-      const response = await fetch(
-        `${API_BASE}/recommendations/${cleanId}?mood=${encodeURIComponent(searchMood)}&showUnplayedOnly=${showUnplayedOnly}`
+      const response = await defensiveFetch(
+        `${API_BASE}/api/recommendations/${cleanId}?mood=${encodeURIComponent(searchMood)}&showUnplayedOnly=${showUnplayedOnly}`
       );
 
-      const data = await response.json();
+      if (!response.ok) throw new Error(response.data.error || 'Something went wrong');
 
-      if (!response.ok) throw new Error(data.error || 'Something went wrong');
-
-      setRecommendations(data.recommendations);
+      setRecommendations(response.data.recommendations);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -122,16 +144,15 @@ function App() {
 
     try {
       const cleanId = normalizeSteamId(steamId);
-      const response = await fetch(
-        `${API_BASE}/quick-picks/${cleanId}?vibe=${encodeURIComponent(vibe)}&showUnplayedOnly=${showUnplayedOnly}`
+      const response = await defensiveFetch(
+        `${API_BASE}/api/quick-picks/${cleanId}?vibe=${encodeURIComponent(vibe)}&showUnplayedOnly=${showUnplayedOnly}`
       );
-      const data = await response.json();
+      
+      if (!response.ok) throw new Error(response.data.error || 'Unable to filter your Steam library.');
 
-      if (!response.ok) throw new Error(data.error || 'Unable to filter your Steam library.');
+      setRecommendations(response.data.recommendations);
 
-      setRecommendations(data.recommendations);
-
-      if (data.recommendations.length === 0 && !showUnplayedOnly) {
+      if (response.data.recommendations.length === 0 && !showUnplayedOnly) {
         setError(`No ${vibe} games were found in your tagged Steam library.`);
       }
 
@@ -161,10 +182,9 @@ function App() {
       let library = ownedGames;
 
       if (library.length === 0) {
-        const response = await fetch(`${API_BASE}/user-games/${cleanId}`);
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Unable to load your Steam library.');
-        library = data.games;
+        const response = await defensiveFetch(`${API_BASE}/api/user-games/${cleanId}`);
+        if (!response.ok) throw new Error(response.data.error || 'Unable to load your Steam library.');
+        library = response.data.games;
         setOwnedGames(library);
       }
 
@@ -222,12 +242,11 @@ function App() {
     try {
       const cleanId = normalizeSteamId(steamId);
 
-      const res = await fetch(`${API_BASE}/stats/${cleanId}`);
-      const data = await res.json();
+      const res = await defensiveFetch(`${API_BASE}/api/stats/${cleanId}`);
 
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) throw new Error(res.data.error);
 
-      setStats(data.stats);
+      setStats(res.data.stats);
       setShowStats(true);
 
       // Load sidebar data if not already loaded
