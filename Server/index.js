@@ -17,7 +17,12 @@ mongoose.connect(process.env.MONGO_URI)
 // We tell the server: "Any URL starting with /api, go look in api.js"
 // Registered in app.js.
 
-// 4. Start Server
-app.listen(PORT, () => {
-  console.log(`[PlayMatch] 🚀 Server running on port ${PORT}`);
-});
+// 4. Start Server (for local development)
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, () => {
+    console.log(`[PlayMatch] 🚀 Server running on port ${PORT}`);
+  });
+}
+
+// 5. Export for Vercel serverless
+module.exports = app;

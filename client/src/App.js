@@ -6,7 +6,9 @@ import PlaytimeMetrics from './components/PlaytimeMetrics';
 import RouletteWheel from './components/RouletteWheel';
 import SteamStats from './components/SteamStats';
 
-const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+// For development, use http://localhost:5000/api
+// For production on Vercel, use relative /api path (rewrites configured in vercel.json)
+const API_BASE = process.env.REACT_APP_API_URL || (process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:5000/api');
 
 const normalizeSteamId = value => {
   const trimmedValue = value.trim();
@@ -49,8 +51,8 @@ function App() {
   const loadSidebarData = async (id) => {
     try {
       const [recentResponse, libraryResponse] = await Promise.all([
-        fetch(`${API_BASE}/api/recent/${id}`),
-        fetch(`${API_BASE}/api/user-games/${id}`)
+        fetch(`${API_BASE}/recent/${id}`),
+        fetch(`${API_BASE}/user-games/${id}`)
       ]);
       const recentData = await recentResponse.json();
       const libraryData = await libraryResponse.json();
@@ -88,7 +90,7 @@ function App() {
       if (recentGames.length === 0) loadSidebarData(cleanId);
 
       const response = await fetch(
-        `${API_BASE}/api/recommendations/${cleanId}?mood=${encodeURIComponent(searchMood)}&showUnplayedOnly=${showUnplayedOnly}`
+        `${API_BASE}/recommendations/${cleanId}?mood=${encodeURIComponent(searchMood)}&showUnplayedOnly=${showUnplayedOnly}`
       );
 
       const data = await response.json();
@@ -121,7 +123,7 @@ function App() {
     try {
       const cleanId = normalizeSteamId(steamId);
       const response = await fetch(
-        `${API_BASE}/api/quick-picks/${cleanId}?vibe=${encodeURIComponent(vibe)}&showUnplayedOnly=${showUnplayedOnly}`
+        `${API_BASE}/quick-picks/${cleanId}?vibe=${encodeURIComponent(vibe)}&showUnplayedOnly=${showUnplayedOnly}`
       );
       const data = await response.json();
 
@@ -159,7 +161,7 @@ function App() {
       let library = ownedGames;
 
       if (library.length === 0) {
-        const response = await fetch(`${API_BASE}/api/user-games/${cleanId}`);
+        const response = await fetch(`${API_BASE}/user-games/${cleanId}`);
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Unable to load your Steam library.');
         library = data.games;
@@ -220,7 +222,7 @@ function App() {
     try {
       const cleanId = normalizeSteamId(steamId);
 
-      const res = await fetch(`${API_BASE}/api/stats/${cleanId}`);
+      const res = await fetch(`${API_BASE}/stats/${cleanId}`);
       const data = await res.json();
 
       if (!res.ok) throw new Error(data.error);
