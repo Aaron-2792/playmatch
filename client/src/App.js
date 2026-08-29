@@ -7,9 +7,9 @@ import RouletteWheel from './components/RouletteWheel';
 import SteamStats from './components/SteamStats';
 
 // Explicit API URL Configuration
-// Production (Vercel frontend → Render backend): uses REACT_APP_API_URL from .env.production
-// Development (localhost): uses local Express server
-const API_BASE = process.env.REACT_APP_API_URL || (process.env.NODE_ENV === 'production' ? 'https://playmatch-backend.onrender.com' : 'http://localhost:5000');
+// Production (Vercel frontend → Vercel backend): uses empty base with /api path (Vercel routes /api/* to serverless)
+// Development (localhost): uses local Express server on port 5000 with /api path
+const API_BASE = process.env.REACT_APP_API_URL || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5000');
 
 // Defensive fetch helper: intercepts text response and logs raw content if JSON parsing fails
 const defensiveFetch = async (url, options = {}) => {
